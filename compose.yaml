@@ -1,0 +1,36 @@
+# ============================================================
+# 本版不使用 Docker。
+# 原因：云服务器还没买，本版只在本机跑（见可行性分析 2.4）。
+# 等买好服务器要部署时，把下面这段取消注释即可。
+#
+# 用法：docker compose up -d
+# 注意：app 那个服务还需要一个 Dockerfile，启用时先补上。
+# ============================================================
+#
+# services:
+#
+#   mysql:
+#     image: mysql:8.0.44
+#     container_name: forum-mysql
+#     restart: unless-stopped
+#     environment:
+#       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+#       MYSQL_DATABASE: forum
+#     ports:
+#       - "3306:3306"
+#     volumes:
+#       - ./mysql-data:/var/lib/mysql
+#     command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+#
+#   app:
+#     build: .
+#     container_name: forum-app
+#     restart: unless-stopped
+#     depends_on:
+#       - mysql
+#     environment:
+#       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/forum?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+#       SPRING_DATASOURCE_USERNAME: root
+#       SPRING_DATASOURCE_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+#     ports:
+#       - "8080:8080"

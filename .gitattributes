@@ -1,0 +1,9 @@
+# 换行符统一成 LF 存进仓库。
+# LF = Unix 换行（\n），CRLF = Windows 换行（\r\n）。
+# 不统一下来的话，同一个文件会因为换行符不同被 git 当成「整个文件都改了」，
+# diff 里全是红绿一片，真正的改动混在里面看不出来。
+#
+# text=auto  : 让 git 自己判断哪些是文本文件，文本文件按下面的 eol 规则处理
+# eol=lf     : 存进仓库用 LF；检出到 Windows 工作区时也保持 LF
+
+* text=auto eol=lf

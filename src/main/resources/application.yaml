@@ -1,0 +1,37 @@
+# ============================================================
+# 这个文件会跟着 git 一起提交 —— 所以里面不能有密码。
+# 数据库密码放在 application-local.yaml 里，那个文件被 .gitignore 挡住了。
+# ============================================================
+
+spring:
+  application:
+    name: Personal_Forum
+
+  # 默认激活 local 这个 profile，也就是去加载 application-local.yaml。
+  # 以后有生产环境了，这里改成 prod，再加一个 application-prod.yaml 就行。
+  profiles:
+    active: local
+
+mybatis-plus:
+  configuration:
+    # 库里的 sort_order / created_at 自动映射到 Java 的 sortOrder / createdAt。
+    # ⚠️ 不打开的话，查出来的驼峰字段全是 null，而且不报错 —— 最难查的那种。
+    map-underscore-to-camel-case: true
+
+    # 把执行的 SQL 打到控制台，开发阶段开着，能一眼看出 SQL 长什么样。
+    # 上线前把这行删掉（或者注释掉）。
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+  global-config:
+    db-config:
+      # 逻辑删除：实体里叫 isDeleted 的字段自动参与。
+      # 有了这一行，调用 deleteById() 时 MyBatis-Plus 会自动变成
+      # UPDATE post SET is_deleted = 1 WHERE id = ?，
+      # 查询时自动带上 WHERE is_deleted = 0 —— 你不用手写这两个条件。
+      logic-delete-field: isDeleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+  # 以后要写自定义 XML 时，放到 src/main/resources/mapper/ 下面，再把下面这行放开。
+  # 现在没这个目录，先留着注释，免得启动时找不到路径反而报错。
+  # mapper-locations: classpath*:/mapper/**/*.xml

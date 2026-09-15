@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!--
+        parent = 父 POM。
+        它的作用是「帮我管版本」：所有 Spring 官方依赖（starter、驱动、测试库）
+        都不用在这里写 <version>，父 POM 已经替你定好了。
+        想改 Spring Boot 版本，改这一处就够了。
+    -->
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>4.1.1</version>
+        <relativePath/> <!-- 从中央仓库找父 POM，不要去本地目录找 -->
+    </parent>
+
+    <!--
+        下面这四行是「我是谁」：坐标 + 名字 + 描述。
+        groupId 一般倒着写域名，artifactId 是工程名。
+        version 后面跟着 SNAPSHOT = 开发中的版本，没发布过。
+    -->
+    <groupId>com.xbcl</groupId>
+    <artifactId>Personal_Forum</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <name>Personal_Forum</name>
+    <description>Personal_Forum</description>
+
+    <properties>
+        <!-- 编译用的 Java 版本，必须和本机 JDK 对得上 -->
+        <java.version>21</java.version>
+    </properties>
+
+    <!--
+        dependencyManagement = 只「登记版本」，不真的引入依赖。
+        下面这个 BOM（物料清单）登记了 MyBatis-Plus 全家桶的版本：
+        之后写 mybatis-plus-* 的依赖时，就不用一个个写 <version> 了，
+        而且所有 mybatis-plus 的包版本会保持一致，不会一个新一个旧。
+    -->
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>com.baomidou</groupId>
+                <artifactId>mybatis-plus-bom</artifactId>
+                <version>3.5.17</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <!--
+        dependencies = 真正会被下载进来的依赖。
+        没写 <version> 的，都是被上面的父 POM 或 BOM 管着的。
+    -->
+    <dependencies>
+
+        <!-- 【Web 骨架】内嵌 Tomcat + Spring MVC + JSON 序列化。
+             写 @RestController、@GetMapping 靠的就是它。
+             不用写版本，父 POM 管。 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webmvc</artifactId>
+        </dependency>
+
+        <!-- 【持久层】MyBatis-Plus 主包。
+             提供 BaseMapper（免写单表 CRUD）和 LambdaQueryWrapper（类型安全的条件构造）。
+             ⚠️ Spring Boot 4 要用这个 boot4 版 starter，用成 boot3 版会起不来。
+             版本由上面的 BOM 提供（3.5.17）。 -->
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-spring-boot4-starter</artifactId>
+        </dependency>
+
+        <!-- 【MySQL 驱动】Java 连 MySQL 的桥。
+             scope=runtime 表示「编译时用不到它，运行时才要」——
+             代码里不会 import 它的类，所以编译阶段不需要它进 classpath。
+             版本由父 POM 管（9.7.0）。 -->
+        <dependency>
+            <groupId>com.mysql</groupId>
+            <artifactId>mysql-connector-j</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- 【分页插件】PaginationInnerInterceptor 的解析器。
+             MyBatis-Plus 从 3.5.9 起把 jsqlparser 拆出核心包了 ——
+             不引这一条，分页功能会在运行时抛 ClassNotFoundException。
+             首页帖子列表（3.1 的 #5）就靠它。 -->
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-jsqlparser</artifactId>
+        </dependency>
+
+        <!-- 【开发提速】改完代码自动重启（比手动停再起快几秒）。
+             scope=runtime + optional=true，只在开发时生效。
+             注意：它改的是「类加载」，改配置文件一般要手动重启才放心。 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-devtools</artifactId>
+            <scope>runtime</scope>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- 【已停用】spring-boot-docker-compose
+             它的行为是：只要发现工程里有 compose.yaml，启动时就自动去跑 docker compose up。
+             本版不用 Docker（见可行性分析 2.4），而且本机 docker 不一定开着 ——
+             留着它可能让启动多报一段错。等真要部署了，把下面这块取消注释再加回来。 -->
+        <!--
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-docker-compose</artifactId>
+            <scope>runtime</scope>
+            <optional>true</optional>
+        </dependency>
+        -->
+
+        <!-- 【少写代码】@Data / @Slf4j / @RequiredArgsConstructor 这些注解靠它生成。
+             optional=true 表示「这个依赖不会传给引用我这个工程的人」（我们用不上这条，但留着无妨）。
+             它能在编译期干活，靠的是下面 build 里的 annotationProcessorPaths 配置。 -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- 【测试】写测试类要用的那一套。
+             scope=test 表示「只在 mvn test 时进 classpath」，打出来的 jar 里不会有它。
+             现在还没写测试类，留着不碍事。 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webmvc-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+    </dependencies>
+
+    <!--
+        build = 打包和编译时怎么干活。
+        这里两个插件一个负责「打成可执行 jar」，一个负责「编译时让 Lombok 生效」。
+    -->
+    <build>
+        <plugins>
+
+            <!-- 【打包】把工程打成一个可以直接 java -jar 运行的胖 jar（内嵌 Tomcat）。
+                 执行 mvn package 会用到它。 -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+
+            <!-- 【编译】配置注解处理器。
+                 Lombok 的 @Data 要在「编译阶段」被处理成真实的 getter/setter，
+                 不给编译器指路（annotationProcessorPaths），
+                 IDEA 里看着没问题、mvn 一编译就说找不到 getter —— 就是这个配置在管。
+                 下面两段分别是主代码和测试代码，配的东西不一样。 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <executions>
+                    <!-- 主代码：要用 lombok + Spring 的配置元数据处理器 -->
+                    <execution>
+                        <id>default-compile</id>
+                        <phase>compile</phase>
+                        <goals>
+                            <goal>compile</goal>
+                        </goals>
+                        <configuration>
+                            <annotationProcessorPaths>
+                                <path>
+                                    <groupId>org.projectlombok</groupId>
+                                    <artifactId>lombok</artifactId>
+                                </path>
+                                <path>
+                                    <groupId>org.springframework.boot</groupId>
+                                    <artifactId>spring-boot-configuration-processor</artifactId>
+                                </path>
+                            </annotationProcessorPaths>
+                        </configuration>
+                    </execution>
+                    <!-- 测试代码：只用 lombok -->
+                    <execution>
+                        <id>default-testCompile</id>
+                        <phase>test-compile</phase>
+                        <goals>
+                            <goal>testCompile</goal>
+                        </goals>
+                        <configuration>
+                            <annotationProcessorPaths>
+                                <path>
+                                    <groupId>org.projectlombok</groupId>
+                                    <artifactId>lombok</artifactId>
+                                </path>
+                            </annotationProcessorPaths>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+        </plugins>
+    </build>
+
+</project>
