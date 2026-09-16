@@ -117,3 +117,5 @@ SHOW TABLES;
 -- 期望 6 行：category / comment / post / post_favorite / post_like / user
 SELECT * FROM category;
 -- 期望 3 行：日常 / 技术 / 水贴
+
+

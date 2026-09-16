@@ -31,6 +31,17 @@ mybatis-plus:
       logic-delete-field: isDeleted
       logic-delete-value: 1
       logic-not-delete-value: 0
+      #
+      # ⚠️ 注意它现在其实还没生效：
+      #    MyBatis-Plus 只对「实体里真实存在的字段」动手，而 user / category
+      #    两张表和对应实体里都没有 is_deleted，所以这三行目前是空转。
+      #    等写 Post / Comment 实体、加上 private Integer isDeleted; 之后它才开始管事。
+      #
+      # ⚠️ 到那时候要小心 user 表上的唯一键 uk_user_username：
+      #    如果哪天 user 也加了逻辑删除，注销过的用户名会永远注册不回来 ——
+      #    查重时被 is_deleted = 0 挡掉（看起来没这个人），
+      #    插入时又被唯一键挡掉（数据库里那行还在）。
+      #    真要做注销功能，唯一键改成 (username, is_deleted)，或者干脆硬删。
 
   # 以后要写自定义 XML 时，放到 src/main/resources/mapper/ 下面，再把下面这行放开。
   # 现在没这个目录，先留着注释，免得启动时找不到路径反而报错。

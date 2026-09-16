@@ -37,7 +37,7 @@ public class Result<T> {
 
     /*
      * 构造器是 private 的：外面不许直接 new Result(...)，
-     * 只能用下面的 ok() / fail()。
+     * 只能用下面的 success() / fail()。
      * 这样能保证「成功一定带 200，失败一定带提示语」，格式不会被人写歪。
      */
     private Result(Integer code, String message, T data) {
@@ -47,14 +47,28 @@ public class Result<T> {
     }
 
     /*
-     * 方法前面的 static 是为了能直接写 Result.ok(数据)，
+     * 方法前面的 static 是为了能直接写 Result.success(数据)，
      * 不用先 new 一个空对象再往里塞。
      */
-    public static <T> Result<T> ok(T data) {
+    public static <T> Result<T> success(T data) {
         return new Result<>(200, "ok", data);
     }
 
+    /**
+     * 失败。固定 500 —— 用它就代表「服务器出问题了」。
+     * 业务上的失败（用户名已存在、密码错误）请用 error(400, ...)，
+     * 否则前端分不出「我填错了」和「服务器挂了」。
+     */
     public static <T> Result<T> fail(String message) {
         return new Result<>(500, message, null);
+    }
+    /** 未找到。404，比如点进一个已经被删掉的帖子 */
+    public static <T> Result<T> notFound(String message) {
+        return new Result<>(404,message,null);
+    }
+
+    /** 指定错误码的失败。400 = 参数/业务问题，401 = 未登录，500 = 系统异常 */
+    public static <T> Result<T> error(Integer code, String message) {
+        return new Result<>(code, message, null);
     }
 }
