@@ -14,6 +14,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.PathVariable;
+import com.xbcl.personal_forum.pojo.vo.PageVO;
 
 import java.util.List;
 
@@ -111,6 +113,48 @@ public class PostController {
         // 没有数据要返回，但也不能返回 void —— 那样前端拿到的响应体是空的，
         // 解析 res.data.code 时会报错。统一返回 Result，失败由异常处理器负责。
         return Result.success(null);
+    }
+
+    /**
+     * 帖子列表。
+     *
+     * <p>GET /dev-api/post/list?pageNum=1&pageSize=10&categoryId=2
+     * <br>这个接口在白名单里，不带 token 也能访问 —— 游客先看得见有什么，
+     * 想点进详情再登录。
+     */
+    @GetMapping("/list")
+    public Result<PageVO<Post>> list(@RequestParam(defaultValue = "1") long pageNum,
+                                     @RequestParam(defaultValue = "10") long pageSize,
+                                     // required = false：不传就是「全部板块」
+                                     @RequestParam(required = false) Long categoryId) {
+        return Result.success(postService.listApproved(pageNum, pageSize, categoryId));
+    }
+
+    /**
+     * 帖子详情。
+     *
+     * <p>GET /dev-api/post/1
+     * <br>要登录。待审 / 驳回的帖，只有作者本人和管理员能看到。
+     */
+    @GetMapping("/{id}")
+    public Result<Post> detail(@PathVariable Long id, HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
+        String role = (String) request.getAttribute("role");
+        return Result.success(postService.detail(id, userId, ROLE_ADMIN.equals(role)));
+    }
+
+    /**
+     * 我的帖子。四种状态都返回。
+     *
+     * <p>GET /dev-api/post/my
+     * <br>userId 从 token 里取 —— 不能让前端传，不然谁都能翻别人的帖子。
+     */
+    @GetMapping("/my")
+    public Result<PageVO<Post>> my(@RequestParam(defaultValue = "1") long pageNum,
+                                   @RequestParam(defaultValue = "10") long pageSize,
+                                   HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
+        return Result.success(postService.listMy(pageNum, pageSize, userId));
     }
 
     /**

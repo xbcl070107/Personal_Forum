@@ -60,7 +60,8 @@ public class WebMvcConfig implements WebMvcConfigurer {
                 .excludePathPatterns(
                         "/auth/register",
                         "/auth/login",
-                        "/category/list"
+                        "/category/list",
+                        "/post/list"        // 帖子列表，游客可见
                 );
     }
 }

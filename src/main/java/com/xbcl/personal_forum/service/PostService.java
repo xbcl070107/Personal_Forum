@@ -9,8 +9,11 @@ import com.xbcl.personal_forum.pojo.dto.PostPublishDTO;
 import com.xbcl.personal_forum.pojo.entity.Post;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.xbcl.personal_forum.pojo.vo.PageVO;
 
 import java.util.List;
+import java.util.Objects;
 
 /**
  * 帖子业务。目前有发帖和审核，列表 / 详情 / 删帖后面往下加。
@@ -68,6 +71,89 @@ public class PostService {
         postMapper.insert(post);
 
         return post.getId();
+    }
+
+    /** 每页最多返回多少条，防止前端传 pageSize=100000 把整张表拖出来 */
+    private static final long MAX_PAGE_SIZE = 50;
+
+    /**
+     * 把前端传来的分页参数夹到合法范围。
+     *
+     * <p>pageNum 传 0 或者负数，拼出来的 LIMIT 是负数，SQL 直接报语法错；
+     * pageSize 传 100000 就是把整张表查回来。这两种都不算「用户填错了」，
+     * 是接口自己该扛住的输入 —— 夹一下，比报 500 体面。
+     */
+    private static <T> Page<T> page(long pageNum, long pageSize) {
+        return new Page<>(Math.max(pageNum, 1), Math.min(pageSize, MAX_PAGE_SIZE));
+    }
+
+    /**
+     * 帖子列表：只出「已通过」的，游客也能看。
+     *
+     * @param categoryId 板块 id。传 null 表示「全部板块」
+     */
+    public PageVO<Post> listApproved(long pageNum, long pageSize, Long categoryId) {
+
+        LambdaQueryWrapper<Post> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Post::getStatus, Post.STATUS_APPROVED)
+                // 三个参数的 eq 是「条件版」重载：第一个参数为 false 时，
+                // 这个条件整条不拼进 SQL。所以 categoryId 为 null 就是查全部，
+                // 不用再写一个 if 把查询拆成两条。
+                .eq(categoryId != null, Post::getCategoryId, categoryId)
+                .orderByDesc(Post::getCreatedAt)
+                .orderByDesc(Post::getId);
+
+        // 走 (status, created_at) 那个联合索引：status 定位，created_at 反向扫
+        return PageVO.of(postMapper.selectPage(page(pageNum, pageSize), wrapper));
+    }
+
+    /**
+     * 帖子详情。
+     *
+     * <p>权限判断放在这里，但 Service 不认识 HttpServletRequest ——
+     * 「你是谁」由 Controller 从 token 里取出来当参数传进来。
+     *
+     * @param currentUserId 当前登录用户，可能为 null（不在白名单，一般都有）
+     * @param isAdmin       是不是管理员
+     */
+    public Post detail(Long postId, Long currentUserId, boolean isAdmin) {
+
+        Post post = postMapper.selectById(postId);
+        if (post == null) {
+            throw new BusinessException(404, "帖子不存在");
+        }
+
+        // 已经通过审核的，谁都能看
+        if (post.getStatus() == Post.STATUS_APPROVED) {
+            return post;
+        }
+
+        // 没通过的，只有作者本人和管理员能看。
+        // 用 Objects.equals 而不是 post.getUserId().equals(...)：
+        // 前者两个都为 null 时返回 true，不会因为某一头是 null 就 NPE。
+        if (isAdmin || Objects.equals(post.getUserId(), currentUserId)) {
+            return post;
+        }
+
+        // 这里回 404，不是 403。
+        // 403 等于告诉对方「这个 id 存在，只是不给你看」——
+        // 拿 id 从 1 数到 100，别人就能数出你有几条待审帖。
+        throw new BusinessException(404, "帖子不存在");
+    }
+
+    /**
+     * 我的帖子。作者看自己的东西，四种状态都要出。
+     */
+    public PageVO<Post> listMy(long pageNum, long pageSize, Long userId) {
+
+        LambdaQueryWrapper<Post> wrapper = new LambdaQueryWrapper<>();
+        // 这里故意不筛 status。
+        // 列表和详情是「只给已经通过的」，这一条不一样 ——
+        // 待审和被驳回的帖，作者自己必须看得见，否则他不知道发出去之后发生了什么。
+        wrapper.eq(Post::getUserId, userId)
+                .orderByDesc(Post::getCreatedAt);
+
+        return PageVO.of(postMapper.selectPage(page(pageNum, pageSize), wrapper));
     }
 
     /**

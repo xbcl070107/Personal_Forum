@@ -4,6 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.http.ResponseEntity;
 
 /**
  * 全局异常处理器。
@@ -28,44 +29,32 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 public class GlobalExceptionHandler {
 
     /**
-     * 业务异常：请求没问题，是规则不允许（用户名已存在、密码错误）。
+     * 业务异常。
      *
-     * <p>message 是我们自己在代码里写的，可以放心给前端看，所以原样返回。
+     * <p>HTTP 状态码跟着 BusinessException 里的 code 走 —— 400 就真的回 400，404 就真的回 404。
+     * 不能靠 @ResponseStatus：那个注解的值是写死的，拿不到 e.getCode()。
+     *
+     * <p>这条规则要和 JwtInterceptor 的 401 对齐：那边是 setStatus(401)，
+     * 这边是 ResponseEntity.status(code)，两边都是「body.code 等于 HTTP 状态码」。
+     * 前端只要在一个地方判断就够了。
      */
     @ExceptionHandler(BusinessException.class)
-    public Result<Void> handleBusiness(BusinessException e) {
-        return Result.error(e.getCode(), e.getMessage());
+    public ResponseEntity<Result<Void>> handleBusiness(BusinessException e) {
+        Result<Void> body = Result.error(e.getCode(), e.getMessage());
+        return ResponseEntity.status(e.getCode()).body(body);
     }
 
-    /**
-     * 参数校验失败：@Valid 没通过（用户名没填、密码长度不够）。
-     *
-     * <p>重点：这个异常是在「进入 Controller 方法体之前」抛的，
-     * 所以写在方法里的 try-catch 永远接不到它，只能在这里接。
-     *
-     * <p>一个 DTO 可能有好几个字段同时不合格，
-     * getFieldError() 只取第一条；要全部列出来得用 getFieldErrors()。
-     */
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public Result<Void> handleValid(MethodArgumentNotValidException e) {
-        // 先取出来存着。下面再调一次也行，但没必要。
+    public ResponseEntity<Result<Void>> handleValid(MethodArgumentNotValidException e) {
         var fieldError = e.getBindingResult().getFieldError();
-
-        // getDefaultMessage() 拿到的就是 DTO 上 @NotBlank(message = "...") 里那串文字
         String msg = (fieldError != null) ? fieldError.getDefaultMessage() : "参数错误";
-
-        return Result.error(400, msg);
+        return ResponseEntity.badRequest().body(Result.error(400, msg));
     }
 
-    /**
-     * 兜底：剩下所有没被上面接住的异常（空指针、SQL 报错、类型转换失败……）。
-     *
-     * <p>堆栈用 log.error 打进后台控制台，前端只给一句「系统异常」。
-     * 不要把 e.getMessage() 直接返回给前端 —— SQL 报错会把表名、字段名带出去。
-     */
     @ExceptionHandler(Exception.class)
-    public Result<Void> handleException(Exception e) {
+    public ResponseEntity<Result<Void>> handleException(Exception e) {
         log.error("系统异常", e);
-        return Result.error(500, "系统异常");
+        return ResponseEntity.status(500).body(Result.error(500, "系统异常"));
     }
+
 }
