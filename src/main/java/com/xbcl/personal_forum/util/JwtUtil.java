@@ -47,8 +47,16 @@ public class JwtUtil {
      * 32~47 字节 → HS256，48~63 → HS384，64 以上 → HS512。
      * 我们的 secret 是 45 个字符，所以是 HS256。
      */
+
+
+    /**
+     * @Value 注解：这是 Spring 的依赖注入方式。
+     * 它会从配置文件（如 application.yml）中读取 jwt.secret（密钥字符串）和 jwt.expire-hours（过期小时数）。
+     * */
     public JwtUtil(@Value("${jwt.secret}") String secret,
                    @Value("${jwt.expire-hours}") long expireHours) {
+        //Keys.hmacShaKeyFor(...)：这是 JJWT 0.12+ 版本的新写法。它会根据你传入的字节数组长度，
+        //自动选择合适的 HMAC 算法（如 HS256、HS384 或 HS512）。
         this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         this.expireMillis = expireHours * 60 * 60 * 1000;
     }
@@ -72,13 +80,14 @@ public class JwtUtil {
         Date now = new Date();
 
         return Jwts.builder()
-                .subject(String.valueOf(userId))
-                .claim("username", username)
-                .claim("role", role)
-                .issuedAt(now)
-                .expiration(new Date(now.getTime() + expireMillis))
-                .signWith(key)
-                .compact();
+                .subject(String.valueOf(userId))                    // 1. 设置主体（通常放用户ID）
+                .claim("username", username)                  // 2. 自定义声明（放用户名）
+                .claim("role", role)                          // 3. 自定义声明（放角色权限）
+                .issuedAt(now)                                      // 4. 签发时间
+                .expiration(new Date(now.getTime() + expireMillis)) // 5. 过期时间
+                .signWith(key)                                      // 6. 使用密钥进行签名
+                .compact();                                         // 7. 压缩成最终的字符串
+
     }
 
     /**
@@ -102,9 +111,9 @@ public class JwtUtil {
      */
     public Claims parse(String token) {
         return Jwts.parser()
-                .verifyWith(key)
-                .build()
-                .parseSignedClaims(token)
-                .getPayload();
+                .verifyWith(key)            // 1. 指定用于验签的密钥
+                .build()                    // 2. 构建解析器
+                .parseSignedClaims(token)   // 3. 解析并校验 Token
+                .getPayload();              // 4. 获取载荷内容
     }
 }

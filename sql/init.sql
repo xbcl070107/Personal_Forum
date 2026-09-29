@@ -53,13 +53,19 @@ CREATE TABLE post (
     title       VARCHAR(100) NOT NULL                          COMMENT '标题',
     content     TEXT         NOT NULL                          COMMENT '正文',
     category_id BIGINT       NOT NULL                          COMMENT '所属板块',
+    -- 审核状态：先审后发。只有 status = 1 的帖子才会出现在列表和详情里。
+    -- DEFAULT 0 是双保险 —— 哪天代码忘了 setStatus，插进去的也是待审，不是直接发布。
+    status      TINYINT      NOT NULL DEFAULT 0                COMMENT '0 待审 / 1 已通过 / 2 已驳回',
     is_deleted  TINYINT(1)   NOT NULL DEFAULT 0                COMMENT '0 正常 / 1 已删（软删除）',
     created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '发布时间',
     updated_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '最后修改时间',
     PRIMARY KEY (id),
     KEY idx_post_user_id (user_id),
     KEY idx_post_created_at (created_at),
-    KEY idx_post_category_id (category_id)
+    KEY idx_post_category_id (category_id),
+    -- 列表查询是「按 status 筛 + 按 created_at 排」，所以是联合索引。
+    -- 单给 status 建没用：它只有三个值，区分度太低，MySQL 不会走。
+    KEY idx_post_status_created (status, created_at)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4 COMMENT ='帖子';
 
