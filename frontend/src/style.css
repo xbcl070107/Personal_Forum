@@ -1,0 +1,704 @@
+/*
+ * 全局样式：设计令牌 + 基础排版 + Element Plus 主题覆盖。
+ *
+ * 【这一版的主题是怎么定的】
+ * 项目叫「冒险者协会」，所以整站按**公会登记处**的样子做，而不是通用的后台管理系统：
+ *
+ *   - 底色是羊皮纸：暖白、带一层极淡的方格纹理，不是冷灰白
+ *   - 主色是墨蓝（登记簿上的墨水）—— 用冷色压住暖底，整页才不至于发黄发闷
+ *   - 点缀是公会金（火漆、印章、徽记），只用在强调处，多了就俗
+ *   - 标题走衬线体，像告示牌和卷宗上的字；正文保持系统无衬线，中文小字读起来才不累
+ *   - 卡片是「压着金边的纸」，悬停时轻轻抬起、金边变亮
+ *
+ * 【宽度为什么分两档】
+ * 列表页和面板页宽（--page-w = 1040px）：卡片是一行一条，越宽一屏放得越多，
+ * 桌面端还能并排放侧栏。详情页和表单页窄（.page--narrow = 780px）：
+ * 连续中文正文铺到 1040px，一行四五十字，读到行尾要来回甩头。
+ * 混用一档必然有一边难受，所以分开定。
+ *
+ * 【这份文件是干什么的】
+ * 颜色、圆角、阴影、间距全收在第 1 节的 CSS 变量里，下面的规则只引用变量。
+ * 想调主题改这几行就行，不用去各个 .vue 里翻 —— 这是不做主题切换也值得这么写的原因：
+ * 「同一个墨灰」只有一个出处，不会出现 #766b58 和 #7a7060 混着用。
+ *
+ * 【为什么 Element Plus 的样式写在这里】
+ * style.css 是全局样式表，没有 scoped，所以这些 .el-xxx 选择器能直接命中组件。
+ * 写在页面里用 :deep() 也生效，但要在七八个 .vue 里各抄一遍 ——
+ * 分页在一处改了圆角、另一处忘了，就长得不一样。
+ * 所以规矩是：**改组件库自带的外观写这里；改某个页面自己的布局，写那个页面里**。
+ */
+
+/* ============================================================
+   1. 设计令牌
+   ============================================================ */
+:root {
+  /* ---- 面：羊皮纸。三档，越往后越亮，用来叠层次 ---- */
+  --c-bg: #f3ebdb;
+  --c-parchment: #fbf6ea;
+  --c-parchment-2: #f6efe0;
+  --c-surface: rgba(252, 248, 239, 0.9);
+  --c-surface-solid: #fdfaf3;
+
+  /* ---- 线条：偏暖的棕灰。不能用纯灰，纯灰压在暖底上会显脏 ---- */
+  --c-line: #e0d3b8;
+  --c-line-soft: #ece2ce;
+  --c-line-strong: #cdbb98;
+
+  /* ---- 墨色文字。正文到辅助信息拉开四档 ----
+     整体比上一版压深了一档：羊皮纸底本来就吃对比度，
+     原来的 #9c907a 用在小字（时间、编号）上几乎糊进背景里，
+     现在 --c-ink-4 提到 #8a7d64，辅助信息也读得清，主次仍然分明。 */
+  --c-ink: #241d16;
+  --c-ink-2: #423a2e;
+  --c-ink-3: #6b6050;
+  --c-ink-4: #8a7d64;
+
+  /* ---- 主色：墨蓝 ---- */
+  --c-primary: #2f5d8a;
+  --c-primary-dark: #24476b;
+  --c-primary-light: #44789f;
+  --c-primary-soft: rgba(47, 93, 138, 0.09);
+  --c-primary-line: rgba(47, 93, 138, 0.22);
+  --c-primary-ring: rgba(47, 93, 138, 0.18);
+
+  /* ---- 公会金 ---- */
+  --c-gold: #b8892b;
+  --c-gold-light: #d9b25e;
+  --c-gold-soft: #f7ecd0;
+  --c-gold-line: rgba(184, 137, 43, 0.36);
+  --c-gold-ring: rgba(184, 137, 43, 0.22);
+
+  /* ---- 语义色。都往暖里调过，跟羊皮纸在同一套色系里 ---- */
+  --c-success: #4a7c59;
+  --c-success-soft: #e8f0e5;
+  --c-warning: #b07d1a;
+  --c-warning-soft: #f9efd6;
+  --c-danger: #a4462f;
+  --c-danger-soft: #f8e7e0;
+
+  /* ---- 阴影：暖色投影。纯黑投影压在米色上会发灰 ----
+     这一版把大阴影的扩散和浓度都提了一档：
+     卡片原来几乎「贴」在背景上，整页显得平。 */
+  --shadow-sm: 0 1px 2px rgba(74, 58, 34, 0.08);
+  --shadow-md: 0 1px 3px rgba(74, 58, 34, 0.07), 0 10px 24px -12px rgba(74, 58, 34, 0.3);
+  --shadow-lg: 0 2px 8px rgba(74, 58, 34, 0.09), 0 26px 46px -18px rgba(74, 58, 34, 0.38);
+  --shadow-primary: 0 6px 16px -6px rgba(47, 93, 138, 0.5);
+
+  /* ---- 圆角。比通用后台方正一点，靠近纸片和木牌 ---- */
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-lg: 14px;
+  --radius-full: 999px;
+
+  /* ---- 字体 ----
+     display 走衬线：告示牌 / 卷宗的标题感。
+     正文用无衬线 —— 中文衬线在小字号下笔画会挤在一起，读起来累，所以只用在标题。
+     Georgia 打头是为了让拉丁字母也吃到衬线，再往后才是中文字体 */
+  --font-display: Georgia, 'Times New Roman', 'Songti SC', 'Noto Serif CJK SC',
+    'Source Han Serif SC', SimSun, serif;
+  --font-body: system-ui, -apple-system, 'Segoe UI', 'Microsoft YaHei', 'PingFang SC', sans-serif;
+
+  /* ---- 动效 ---- */
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --t-fast: 0.16s;
+  --t: 0.24s;
+
+  /* ---- 布局 ---- */
+  /* 880px 在 1280 宽的屏上会留出两大块空白，页面显得又瘦又空。
+     放到 1040：正文行长还在舒服的范围内，列表也能多透出一点呼吸感。
+     窄屏本来就走百分比，不受这个值影响。 */
+  --page-w: 1040px;
+  --topbar-h: 62px;
+}
+
+/* ============================================================
+   2. 基础
+   ============================================================ */
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--c-ink);
+  background-color: var(--c-bg);
+
+  /*
+   * 背景分几层叠出来，从下往上看：
+   * 1. 前两层是一圈极淡的方格 —— 像账本纸上的格子，几乎看不见，
+   *    但整页不再是一块死板的米色。（用 linear-gradient 画线，不用图片，零请求）
+   * 2. 左上冷光、右上金光 —— 让羊皮纸有受光的感觉，墨蓝和金色互相呼应
+   * 3. 底部一层暖棕 —— 视线自然落到中间的内容上
+   *
+   * fixed 是为了滚动时光晕不跟着跑，否则长列表往下滚会变成一条一条的色带。
+   */
+  background-image:
+    linear-gradient(rgba(120, 96, 60, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(120, 96, 60, 0.045) 1px, transparent 1px),
+    radial-gradient(780px 460px at 10% -8%, rgba(47, 93, 138, 0.11), transparent 62%),
+    radial-gradient(660px 400px at 94% 0%, rgba(184, 137, 43, 0.17), transparent 60%),
+    radial-gradient(900px 520px at 50% 110%, rgba(120, 96, 60, 0.15), transparent 66%);
+  background-size:
+    26px 26px,
+    26px 26px,
+    100% 100%,
+    100% 100%,
+    100% 100%;
+  background-attachment: fixed;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 标题一律衬线。中文 600 比 700 耐看，笔画不容易糊 */
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  color: var(--c-ink);
+  letter-spacing: 0.01em;
+}
+
+a {
+  color: var(--c-primary);
+  text-decoration: none;
+}
+
+/* 键盘 Tab 走到哪都要看得见。:focus-visible 不会被鼠标点击触发，
+   所以这条只对键盘用户生效，不会让点过的按钮挂个难看的框 */
+:focus-visible {
+  outline: 2px solid var(--c-gold);
+  outline-offset: 2px;
+}
+
+/* 滚动条也顺手管一下，Windows 默认那条偏粗偏灰 */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(120, 96, 60, 0.3);
+  border: 3px solid transparent;
+  border-radius: var(--radius-full);
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(120, 96, 60, 0.5);
+  background-clip: content-box;
+}
+
+/* 选中文字：羊皮纸上的金色记号笔 */
+::selection {
+  background: rgba(217, 178, 94, 0.42);
+}
+
+/* ============================================================
+   3. 布局与通用类
+   ============================================================ */
+
+/* 页面容器：全站宽度由这里统一。各个 .vue 的根元素套这个类 */
+.page {
+  width: 100%;
+  max-width: var(--page-w);
+  margin: 0 auto;
+  padding: 26px 20px 60px;
+}
+
+/*
+ * .page--narrow —— 阅读型和表单型页面单独收窄。
+ *
+ * 【为什么列表页和详情页不能共用同一个宽度】
+ * 列表页宽一点好：卡片是「一行一条」，越宽越能一屏放下更多，
+ * 也能并排放侧栏。但详情页是连续正文 —— 1040px 宽的中文一行能排到
+ * 四五十个字，读到行尾要来回甩头，眼睛很容易串行。
+ *
+ * 所以宽度分两档：列表/面板页用 --page-w，纯阅读和填表用 780px。
+ * 780 是中文正文比较舒服的上限（一行 30 字上下）。
+ */
+.page--narrow {
+  max-width: 780px;
+}
+
+/*
+ * .panel —— 全站通用的一张「纸」。
+ * 半透明底 + 背景模糊，让后面的方格纹理隐约透出来，才有纸叠纸的层次。
+ * 最上面那条 inset 高光是「纸的受光边」：没有它，卡片看着像平贴的色块。
+ */
+.panel {
+  position: relative;
+  background: var(--c-surface);
+  backdrop-filter: saturate(140%) blur(10px);
+  -webkit-backdrop-filter: saturate(140%) blur(10px);
+  border: 1px solid var(--c-line);
+  border-radius: var(--radius-lg);
+  padding: 22px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    var(--shadow-md);
+}
+
+/* 卡片之间留点空隙，不然委托列表挤成一坨 */
+.card + .card {
+  margin-top: 12px;
+}
+
+/* 正文里的换行要能显示出来 —— 发布委托时敲的回车得保留 */
+.pre-wrap {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/*
+ * .ribbon —— 卡片左上角的一条状态色边（封条）。
+ * 用 ::before 画，不占文档流，纯装饰。
+ * 颜色由各自的修饰类决定（.ribbon-success / .ribbon-danger ...）：
+ * 一列卡片扫下去，靠颜色就能分出「已通过 / 待核 / 已驳回」。
+ *
+ * 做成贴住上边缘的一条，而不是原来那个悬空的小方块 ——
+ * 悬空的小色块在暖底上像渲染残留，贴着边才读得出「这是这条的标记」。
+ */
+.ribbon::before {
+  content: '';
+  position: absolute;
+  left: 18px;
+  top: -1px;
+  width: 44px;
+  height: 3px;
+  border-radius: 0 0 3px 3px;
+  background: linear-gradient(90deg, var(--c-gold), var(--c-gold-light));
+}
+
+.ribbon-success::before {
+  background: var(--c-success);
+}
+
+.ribbon-danger::before {
+  background: var(--c-danger);
+}
+
+.ribbon-warning::before {
+  background: var(--c-warning);
+}
+
+/* 页面标题区：眉题 + 主标题 + 右侧操作，几个页面共用同一套结构 */
+.page-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+
+.page-head h2 {
+  margin: 2px 0 0;
+  font-size: 23px;
+}
+
+/* 眉题：小号、宽字距、金色 —— 像卷宗角上的分类标签 */
+.eyebrow {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--c-gold);
+}
+
+/*
+ * .ornament —— 装饰性分隔：一条渐隐的细线，中间一颗菱形。
+ * 比 el-divider 那条生硬的横线更贴主题，用在正文和评论区之间。
+ */
+.ornament {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 22px 0;
+}
+
+.ornament::before,
+.ornament::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--c-line-strong), transparent);
+}
+
+/* 中间那颗菱形：一个正方形转 45 度 */
+.ornament i {
+  width: 6px;
+  height: 6px;
+  transform: rotate(45deg);
+  background: var(--c-gold-light);
+  flex-shrink: 0;
+}
+
+/*
+ * .seal —— 方形徽记 / 印章，用来放首字。
+ * 里面压一圈内描边，看起来像盖上去的，而不是画上去的。
+ */
+.seal {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  border-radius: 11px;
+  font-family: var(--font-display);
+  font-weight: 600;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.6),
+    var(--shadow-sm);
+}
+
+/* ============================================================
+   4. Element Plus 主题覆盖
+   把组件库默认那条亮蓝 (#409eff) 换成墨蓝，
+   圆角、边框、阴影全部跟着走 —— 免得我们的纸是暖的、按钮是冷的。
+   ============================================================ */
+:root {
+  --el-color-primary: #2f5d8a;
+  --el-color-primary-light-3: #44789f;
+  --el-color-primary-light-5: #7ba0bd;
+  --el-color-primary-light-7: #b3c8d9;
+  --el-color-primary-light-8: #d5e0e9;
+  --el-color-primary-light-9: rgba(47, 93, 138, 0.09);
+
+  --el-color-success: #4a7c59;
+  --el-color-success-light-9: #e8f0e5;
+  --el-color-warning: #b07d1a;
+  --el-color-warning-light-9: #f9efd6;
+  --el-color-danger: #a4462f;
+  --el-color-danger-light-9: #f8e7e0;
+
+  --el-border-radius-base: 9px;
+  --el-border-radius-small: 7px;
+  --el-border-color: #dccfb4;
+  --el-border-color-light: #e6dcc6;
+  --el-border-color-lighter: #ece2ce;
+  --el-text-color-primary: #2b241c;
+  --el-text-color-regular: #4c4438;
+  --el-text-color-secondary: #766b58;
+  --el-text-color-placeholder: #a89c86;
+  --el-fill-color-blank: #fdfaf3;
+  --el-bg-color: #fdfaf3;
+  --el-bg-color-overlay: #fdfaf3;
+  --el-font-size-base: 14px;
+}
+
+/* ---- 按钮 ---- */
+.el-button {
+  font-weight: 500;
+  border-radius: 9px;
+  transition:
+    transform var(--t-fast) var(--ease),
+    box-shadow var(--t) var(--ease),
+    background-color var(--t) var(--ease),
+    border-color var(--t) var(--ease);
+}
+
+/* 主按钮：墨蓝渐变 + 一圈金边。悬停抬起 1px，金边变亮 */
+.el-button--primary {
+  background: linear-gradient(135deg, var(--c-primary-light), var(--c-primary-dark));
+  border: 1px solid var(--c-gold-line);
+  box-shadow: var(--shadow-primary);
+}
+
+.el-button--primary:hover,
+.el-button--primary:focus {
+  background: linear-gradient(135deg, #4d82a8, var(--c-primary));
+  border-color: var(--c-gold-light);
+  transform: translateY(-1px);
+  box-shadow: 0 10px 22px -8px rgba(47, 93, 138, 0.62);
+}
+
+.el-button--primary:active {
+  transform: translateY(0);
+}
+
+/* 成功 / 危险：审核台那两个按钮，底色调暖 */
+.el-button--success {
+  background: linear-gradient(135deg, #5b8f6b, var(--c-success));
+  border: 1px solid rgba(184, 137, 43, 0.3);
+}
+
+.el-button--danger.is-plain {
+  background: var(--c-danger-soft);
+  border-color: rgba(164, 70, 47, 0.35);
+  color: var(--c-danger);
+}
+
+.el-button--danger.is-plain:hover {
+  background: var(--c-danger);
+  border-color: var(--c-danger);
+  color: #fff;
+}
+
+/* 文字按钮：顶栏里用得多，悬停给一层浅底 */
+.el-button.is-text {
+  padding: 8px 12px;
+  border-radius: 9px;
+  color: var(--c-ink-2);
+}
+
+.el-button.is-text:hover {
+  background: var(--c-primary-soft);
+  color: var(--c-primary);
+}
+
+.el-button.is-round {
+  border-radius: var(--radius-full);
+}
+
+/* ---- 卡片 ----
+   shadow="never" 默认是「无边框无阴影」的一坨白，这里补上暖边和淡投影 */
+.el-card {
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--c-line);
+  background: var(--c-surface);
+  backdrop-filter: saturate(140%) blur(10px);
+  -webkit-backdrop-filter: saturate(140%) blur(10px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    var(--shadow-md);
+}
+
+.el-card.is-always-shadow {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    var(--shadow-md);
+}
+
+.el-card__body {
+  padding: 22px;
+}
+
+/* ---- 输入类 ---- */
+.el-input__wrapper,
+.el-textarea__inner {
+  border-radius: 9px;
+  background-color: rgba(255, 253, 248, 0.85);
+  box-shadow: 0 0 0 1px var(--el-border-color) inset;
+  transition: box-shadow var(--t) var(--ease);
+}
+
+/* 聚焦时套一圈淡金外发光。默认只把边框换成主色，焦点不够明显 */
+.el-input__wrapper.is-focus,
+.el-textarea__inner:focus {
+  box-shadow:
+    0 0 0 1px var(--c-primary) inset,
+    0 0 0 4px var(--c-gold-ring);
+}
+
+.el-textarea__inner {
+  line-height: 1.8;
+  padding: 10px 12px;
+  resize: vertical;
+}
+
+/* ---- 下拉框 ---- */
+.el-select__wrapper {
+  border-radius: 9px;
+  background-color: rgba(255, 253, 248, 0.85);
+  transition: box-shadow var(--t) var(--ease);
+}
+
+.el-select__wrapper.is-focused {
+  box-shadow:
+    0 0 0 1px var(--c-primary) inset,
+    0 0 0 4px var(--c-gold-ring);
+}
+
+.el-select-dropdown__item.is-selected {
+  color: var(--c-primary);
+  font-weight: 600;
+}
+
+/* ---- 板块筛选的按钮组 ----
+   做成一颗颗木牌胶囊：未选中是描边木牌，选中是墨蓝实心 + 金边 */
+.el-radio-group {
+  gap: 6px;
+}
+
+.el-radio-button__inner {
+  border: 1px solid var(--c-line);
+  border-radius: var(--radius-full);
+  background: rgba(255, 253, 248, 0.7);
+  color: var(--c-ink-3);
+  font-weight: 500;
+  padding: 7px 16px;
+  box-shadow: none;
+  transition:
+    background var(--t) var(--ease),
+    color var(--t) var(--ease),
+    border-color var(--t) var(--ease),
+    box-shadow var(--t) var(--ease);
+}
+
+.el-radio-button__inner:hover {
+  color: var(--c-primary);
+  border-color: var(--c-primary-line);
+  background: var(--c-primary-soft);
+}
+
+/*
+ * ⚠️ 这两条要连 ::before 一起处理。
+ * Element Plus 用伪元素画相邻按钮之间那条竖线，只改 .el-radio-button__inner
+ * 的话它会继续显示，选中态看着像裂了条缝。
+ */
+.el-radio-button__original-radio:checked + .el-radio-button__inner,
+.el-radio-button.is-active .el-radio-button__inner {
+  background: linear-gradient(135deg, var(--c-primary-light), var(--c-primary-dark));
+  border-color: var(--c-gold-line);
+  color: #fdf8ec;
+  box-shadow: var(--shadow-primary);
+}
+
+.el-radio-button__original-radio:checked + .el-radio-button__inner::before,
+.el-radio-button.is-active .el-radio-button__inner::before {
+  display: none;
+}
+
+.el-radio-button:first-child .el-radio-button__inner,
+.el-radio-button:last-child .el-radio-button__inner {
+  border-radius: var(--radius-full);
+}
+
+/* ---- 标签：做成一枚小印章 ---- */
+.el-tag {
+  border-radius: var(--radius-full);
+  font-weight: 500;
+  padding: 0 10px;
+  border-width: 1px;
+}
+
+.el-tag--success {
+  background: var(--c-success-soft);
+  border-color: rgba(74, 124, 89, 0.32);
+  color: var(--c-success);
+}
+
+.el-tag--warning {
+  background: var(--c-warning-soft);
+  border-color: rgba(176, 125, 26, 0.34);
+  color: var(--c-warning);
+}
+
+.el-tag--danger {
+  background: var(--c-danger-soft);
+  border-color: rgba(164, 70, 47, 0.32);
+  color: var(--c-danger);
+}
+
+/* ---- 分页 ---- */
+.el-pagination {
+  --el-pagination-button-bg-color: transparent;
+  font-weight: 500;
+}
+
+.el-pagination button,
+.el-pager li {
+  border-radius: 9px;
+  transition:
+    background-color var(--t) var(--ease),
+    color var(--t) var(--ease);
+}
+
+.el-pager li.is-active {
+  background: linear-gradient(135deg, var(--c-primary-light), var(--c-primary-dark));
+  color: #fdf8ec;
+  box-shadow: var(--shadow-primary);
+}
+
+/* ---- 弹窗 / 消息 ---- */
+.el-message-box,
+.el-message {
+  border-radius: var(--radius);
+  border: 1px solid var(--c-line-strong);
+  background: var(--c-surface-solid);
+  box-shadow: var(--shadow-lg);
+}
+
+.el-message-box__title {
+  font-family: var(--font-display);
+  font-weight: 600;
+}
+
+/* ---- 分隔线 ---- */
+.el-divider {
+  border-color: var(--c-line-soft);
+}
+
+/* ---- 表单标签：做成登记表的字段名 ---- */
+.el-form-item__label {
+  font-weight: 600;
+  color: var(--c-ink-2);
+  padding-bottom: 4px;
+  letter-spacing: 0.02em;
+}
+
+/* ---- 加载遮罩 ---- */
+.el-loading-mask {
+  border-radius: var(--radius-lg);
+  background-color: rgba(251, 246, 234, 0.72);
+  backdrop-filter: blur(2px);
+}
+
+/* ============================================================
+   5. 动效
+   ============================================================ */
+
+/* 逐条淡入上升。组件里用 :style="{ animationDelay: ... }" 错开，
+   整页一起闪会显得吵 */
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.fade-up {
+  animation: fade-up 0.42s var(--ease) both;
+}
+
+/* 尊重系统的「减少动态效果」。开了这个开关的人（晕动症、或者单纯嫌晃）
+   不该被入场动画烦到，所以整段关掉，不是缩短 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* ============================================================
+   6. 窄屏
+   ============================================================ */
+@media (max-width: 640px) {
+  .page {
+    padding: 16px 12px 44px;
+  }
+
+  .panel {
+    padding: 16px;
+  }
+
+  .el-card__body {
+    padding: 16px;
+  }
+}
