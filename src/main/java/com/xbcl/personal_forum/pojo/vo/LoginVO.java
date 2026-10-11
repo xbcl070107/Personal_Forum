@@ -12,7 +12,7 @@ import lombok.Data;
  *       <pre>Authorization: Bearer eyJhbGciOi...</pre>
  *       那七个字符 "Bearer " 加空格是 HTTP 的约定写法，拦截器就是按它切字符串的，
  *       少了它一律按「没带 token」处理 —— 现象是登录明明成功了，下一个请求还是 401。</li>
- *   <li>id / username / role 存起来，渲染右上角的昵称，
+ *   <li>id / username / nickname / role 存起来，渲染右上角的昵称，
  *       以及决定「这条帖子下面要不要显示删除按钮」。</li>
  * </ul>
  *
@@ -30,8 +30,21 @@ public class LoginVO {
     /** 用户 id。前端用它做本地判断（比如「是不是我的帖子」），也用于发帖后的跳转 */
     private Long id;
 
-    /** 登录名，显示在页面右上角 */
+    /**
+     * 登录名。唯一。
+     *
+     * <p>前端拿它当一个稳定标识用（头像配色、@handle 提示），
+     * 但<b>不拿它当展示名</b> —— 页面上显示的是 nickname。
+     */
     private String username;
+
+    /**
+     * 昵称。右上角显示的就是这个。
+     *
+     * <p>前端会把它存进 localStorage，所以刷新页面之后名字还在。
+     * 允许和别人重名，别拿它做任何唯一性判断。
+     */
+    private String nickname;
 
     /**
      * 角色：ADMIN / USER。目前注册一律给 USER。

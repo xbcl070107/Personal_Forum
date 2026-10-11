@@ -60,3 +60,17 @@ export function pendingPosts() {
 export function auditPost(postId, pass) {
   return request.post('/post/audit', null, { params: { postId, pass } })
 }
+
+/**
+ * 删帖。作者本人和 ADMIN 都能删。
+ *
+ * ⚠️ 是 **DELETE**，id 在路径里，没有请求体 —— 所以不是 request.post。
+ * 后端做的是逻辑删除（UPDATE post SET is_deleted = 1），但那属于后端的事。
+ *
+ * 删不掉时返回 code 404「帖子不存在，或者不是你发的」：
+ * 这条可能已经被删了，也可能压根不是你的 —— 两种情况后端故意不区分。
+ */
+export function deletePost(id) {
+  return request.delete(`/post/${id}`)
+}
+

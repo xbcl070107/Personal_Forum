@@ -1,12 +1,13 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import EmptyState from '../components/EmptyState.vue'
-import { getPost } from '../api/post'
+import PostActions from '../components/PostActions.vue'
+import { deletePost, getPost } from '../api/post'
 import { listComments, publishComment } from '../api/comment'
 import { useUserStore } from '../store/user'
-import { authorOf, AVATAR_PALETTE, formatTime, statusOf } from '../utils/format'
+import { authorOf, avatarColorOf, formatTime, statusOf } from '../utils/format'
 
 /**
  * 帖子详情页：委托正文 + 评论区。
@@ -40,15 +41,14 @@ const contentLength = computed(() => content.value.length)
 const nearLimit = computed(() => contentLength.value > 450)
 
 /**
- * 头像配色：跟顶栏同一份色板（从 utils/format.js 引，不在各处抄一遍），
- * 同一个人在各处颜色一致。
- * 后端 CommentVO 只给了 username、没有头像地址 —— 颜色就是它「长什么样」的全部。
+ * 评论头像配色。
+ *
+ * 算法本身收在 utils/format.js 的 avatarColorOf 里 —— 原来这里自己抄了一份
+ * 「字符码求和取模」，和顶栏那份是重复实现。两处都改倒还好，改一处就会
+ * 出现「同一个人顶栏一个色、评论区一个色」。
  */
 function avatarStyle(username) {
-  const name = username || ''
-  let sum = 0
-  for (let i = 0; i < name.length; i += 1) sum += name.charCodeAt(i)
-  return { background: AVATAR_PALETTE[sum % AVATAR_PALETTE.length] }
+  return { background: avatarColorOf(username) }
 }
 
 function initialOf(username) {
@@ -95,6 +95,58 @@ async function handlePublish() {
   loadComments()
 }
 
+/**
+ * 这条帖是不是「已过审」。
+ *
+ * 只有已过审的帖才能点赞 / 收藏 —— 后端 requireApproved 对其它状态直接回 404。
+ * 待审 / 驳回的帖只有作者本人和管理员看得到，所以这里要跳过 status != 1 的情况。
+ */
+const approved = computed(() => post.value?.status === 1)
+
+/**
+ * 当前用户能不能删这条帖。
+ *
+ * 规则跟后端 PostService.delete 一致：作者本人，或者管理员。
+ * ⚠️ 这只是「要不要画出按钮」—— 真正拦人的是后端那个 WHERE 条件。
+ * 前端算错了顶多多显示一个按钮，点下去会被后端的 404 挡住。
+ */
+const canDelete = computed(() => {
+  if (!post.value || !userStore.isLogin) return false
+  if (userStore.isAdmin) return true
+  // id 类型要对齐：路由参数是字符串，store 里是数字
+  return Number(post.value.userId) === Number(userStore.user?.id)
+})
+
+/**
+ * 删帖。
+ *
+ * 两步确认：这个动作不可逆（后端是逻辑删除，但页面上没有「恢复」入口），
+ * 而且顶栏的按钮挨得近 —— 和退出登录同理，问一句比事后后悔便宜。
+ */
+async function handleDelete() {
+  try {
+    await ElMessageBox.confirm(
+      `确定删除《${post.value.title}》？删除后列表里就看不到了。`,
+      '删除委托',
+      { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' },
+    )
+  } catch {
+    return // 点了取消
+  }
+
+  const res = await deletePost(postId)
+
+  if (res.code !== 200) {
+    // 常见的是 404「帖子不存在，或者不是你发的」—— 可能别的标签页已经删过了
+    ElMessage.error(res.message)
+    return
+  }
+
+  ElMessage.success('已删除')
+  // 留在详情页没意义了（这条再也查不到），回列表
+  router.push('/my')
+}
+
 onMounted(async () => {
   await Promise.all([loadPost(), loadComments()])
   loading.value = false
@@ -120,15 +172,19 @@ onMounted(async () => {
 
         <div class="meta">
           <!--
-            作者身份牌。接口只返回 userId，没有作者名（PostService 返回的是裸 Post），
-            所以名字和颜色由 userId 稳定推导 —— 见 utils/format.js 的 authorOf。
-            原来这里写死了一个「冒险者」，等于所有帖子都是同一个人发的。
+            作者身份牌。显示 nickname（昵称，可重复），username（唯一）只用来算头像色 ——
+            两个都来自后端 PostVO。
+            以前这里只能按 userId 推名字，同一个人发了帖又评论时，
+            帖头显示「抄书人」、评论区显示「林间旅人」，一条帖子里两个名字。
           -->
           <span class="author">
-            <span class="avatar" :style="{ background: authorOf(post.userId).color }">
-              {{ authorOf(post.userId).initial }}
+            <span
+              class="avatar"
+              :style="{ background: authorOf(post.userId, post.nickname, post.username).color }"
+            >
+              {{ authorOf(post.userId, post.nickname, post.username).initial }}
             </span>
-            <span>{{ authorOf(post.userId).name }}</span>
+            <span>{{ authorOf(post.userId, post.nickname, post.username).name }}</span>
           </span>
 
           <span class="sep">·</span>
@@ -147,6 +203,25 @@ onMounted(async () => {
         <div class="ornament"><i></i></div>
 
         <div class="pre-wrap content">{{ post.content }}</div>
+
+        <!--
+          互动栏：点赞 / 收藏 + （有权限时）删除。
+          最上面那条分隔线由 .post-foot 自己画，不用 ornament ——
+          那两个装饰线挨太近会显得吵。
+        -->
+        <footer class="post-foot">
+          <PostActions :post-id="post.id" :enabled="approved" />
+
+          <el-button
+            v-if="canDelete"
+            text
+            size="small"
+            class="del"
+            @click="handleDelete"
+          >
+            删除这份委托
+          </el-button>
+        </footer>
       </article>
 
       <section class="panel comment-panel card fade-up" style="animation-delay: 60ms">
@@ -164,13 +239,17 @@ onMounted(async () => {
 
         <ul v-else class="comments">
           <li v-for="c in comments" :key="c.id" class="comment">
+            <!--
+              头像色用 c.username（唯一）算，显示的名字用 c.nickname（可重复）。
+              反过来做的话，两个撞昵称的人会连颜色和首字都一样，评论区分不出谁是谁。
+            -->
             <span class="avatar cm-avatar" :style="avatarStyle(c.username)">
-              {{ initialOf(c.username) }}
+              {{ initialOf(c.nickname || c.username) }}
             </span>
 
             <div class="comment-main">
               <div class="comment-head">
-                <span class="comment-user">{{ c.username }}</span>
+                <span class="comment-user">{{ c.nickname || c.username }}</span>
                 <span class="comment-time">{{ formatTime(c.createdAt) }}</span>
               </div>
               <div class="pre-wrap comment-text">{{ c.content }}</div>
@@ -293,6 +372,29 @@ onMounted(async () => {
   line-height: 1.95;
   color: var(--c-ink-2);
   letter-spacing: 0.012em;
+}
+
+/* ---- 互动栏 ----
+   正文和评论区之间的一条。删除推到最右边，和互动按钮分开 ——
+   删除是破坏性动作，不该挨着点赞，手滑一下代价太大。 */
+.post-foot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--c-line-soft);
+}
+
+.del {
+  margin-left: auto;
+  color: var(--c-ink-4);
+}
+
+/* 悬停才变红：平时不抢注意力，指上去才提示「这个动作是危险的」 */
+.del:hover {
+  color: var(--c-danger);
+  background: var(--c-danger-soft);
 }
 
 /* ---- 评论 ---- */

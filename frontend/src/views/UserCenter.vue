@@ -1,9 +1,9 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import EmptyState from '../components/EmptyState.vue'
-import { myPosts } from '../api/post'
+import { deletePost, myPosts } from '../api/post'
 import { formatTime, statusOf } from '../utils/format'
 
 /**
@@ -58,6 +58,44 @@ async function load() {
 function handlePageChange(p) {
   pageNum.value = p
   load()
+}
+
+/**
+ * 在这一页里删掉一条委托。
+ *
+ * 【为什么这里不用判「是不是我发的」】
+ * 这个列表的数据来自 /post/my —— 后端只返回当前登录用户自己的帖子，
+ * 所以这一页里的每一条都归你，删除按钮永远可以显示。
+ * （详情页不一样：那里可能是别人的帖，所以要算 canDelete。）
+ *
+ * 【为什么不直接把这条从数组里 splice 掉】
+ * 删完这一页可能空出来一个位置，却还有下一页的数据 ——
+ * 于是列表底部会出现「空位 + 分页上还有下一页」的怪状态。
+ * 重新查一次这一页，让后端决定这一页还剩什么。
+ * 多一次请求换掉一类「看着像丢数据」的显示问题，值。
+ */
+async function handleDelete(post) {
+  try {
+    await ElMessageBox.confirm(`确定删除《${post.title}》？删除后列表里就看不到了。`, '删除委托', {
+      type: 'warning',
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+    })
+  } catch {
+    return // 点了取消
+  }
+
+  const res = await deletePost(post.id)
+
+  if (res.code !== 200) {
+    // 一般是 404：这条可能已经在别的标签页删掉了
+    ElMessage.error(res.message)
+    return
+  }
+
+  ElMessage.success('已删除')
+  // 等一下再重查：不然确认弹窗还在淡出，成功提示就叠上来了
+  setTimeout(load, 220)
 }
 
 onMounted(load)
@@ -119,6 +157,19 @@ onMounted(load)
             <span>{{ formatTime(post.createdAt) }}</span>
           </div>
         </div>
+
+        <!--
+          删除。@click.stop 是必须的：卡片整块是可点的（点哪儿都进详情），
+          不拦一下，点删除会先跳走再弹确认框。
+        -->
+        <button
+          type="button"
+          class="del"
+          title="删除这份委托"
+          @click.stop="handleDelete(post)"
+        >
+          删除
+        </button>
 
         <span class="arrow">→</span>
       </article>
@@ -312,6 +363,51 @@ onMounted(load)
   transition:
     opacity var(--t) var(--ease),
     transform var(--t) var(--ease);
+}
+
+/*
+ * 行内删除按钮。
+ * 平时只是一行浅灰小字（一列卡片里放十个红按钮会很吵），
+ * 鼠标移到卡片上才浮出来 —— 和右边那个箭头同一套逻辑。
+ *
+ * ⚠️ 用 visibility 控制显隐，不用 opacity：
+ * opacity 是渐变，移入 / 移出的那 0.24 秒里按钮处于半透明状态 ——
+ * 看得见摸不着，还能点。visibility 是跳变的，要么完整显示、要么完全不存在，
+ * 不会出现那种「灰蒙蒙但是能按」的中间态，也就不会有误击。
+ */
+.del {
+  flex-shrink: 0;
+  padding: 5px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-full);
+  background: none;
+  font-family: inherit;
+  font-size: 12px;
+  color: var(--c-ink-4);
+  cursor: pointer;
+  visibility: hidden;
+  transition:
+    color var(--t) var(--ease),
+    background var(--t) var(--ease),
+    border-color var(--t) var(--ease);
+}
+
+.post:hover .del,
+.del:focus-visible {
+  visibility: visible;
+}
+
+.del:hover {
+  color: var(--c-danger);
+  background: var(--c-danger-soft);
+  border-color: rgba(164, 70, 47, 0.28);
+}
+
+/* 触屏没有 hover，隐藏按钮等于没有这个功能，所以窄屏一律显示 */
+@media (hover: none) {
+  .del {
+    visibility: visible;
+  }
 }
 
 .pager {

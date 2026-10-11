@@ -28,8 +28,11 @@ public class CommentVO {
     /** 评论人 id。前端点用户名跳个人主页的时候要用 */
     private Long userId;
 
-    /** 评论人登录名。由 Service 批量查出来回填，不是数据库里直接查的 */
+    /** 评论人登录名，唯一。不是展示名，别直接显示给用户 */
     private String username;
+
+    /** 评论人昵称，展示用。评论区显示的就是它 */
+    private String nickname;
 
     /** 评论内容 */
     private String content;

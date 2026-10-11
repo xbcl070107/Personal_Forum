@@ -26,12 +26,32 @@ export const useUserStore = defineStore('user', () => {
   const isAdmin = computed(() => user.value?.role === 'ADMIN')
 
   /**
+   * 页面上该显示的名字。
+   *
+   * 昵称优先，昵称为空才退回用户名 —— 这是兜底：正常情况下注册就要求填昵称，
+   * 但 localStorage 里可能还留着旧版本存的 user（那时候只有 username），
+   * 不兜一下顶栏会显示空白。
+   */
+  const displayName = computed(() => user.value?.nickname || user.value?.username || '')
+
+  /**
    * 登录成功后调用。
-   * 参数就是后端 /auth/login 返回的那段 data：{ id, username, role, token }
+   * 参数就是后端 /auth/login 返回的那段 data：
+   * { id, username, nickname, role, token }
+   *
+   * 【username 和 nickname 要分开存】
+   * username 唯一，用来当稳定标识（头像配色的键、以后做 @handle）；
+   * nickname 可重复，是页面上显示的名字。
+   * 顶栏显示 nickname，但配色用 username —— 两个人撞昵称时颜色才不会也一样。
    */
   function setLogin(data) {
     token.value = data.token
-    user.value = { id: data.id, username: data.username, role: data.role }
+    user.value = {
+      id: data.id,
+      username: data.username,
+      nickname: data.nickname,
+      role: data.role,
+    }
     localStorage.setItem('token', data.token)
     localStorage.setItem('user', JSON.stringify(user.value))
   }
@@ -44,5 +64,5 @@ export const useUserStore = defineStore('user', () => {
     localStorage.removeItem('user')
   }
 
-  return { token, user, isLogin, isAdmin, setLogin, logout }
+  return { token, user, isLogin, isAdmin, displayName, setLogin, logout }
 })

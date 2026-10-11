@@ -1,10 +1,13 @@
 package com.xbcl.personal_forum.common;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-import org.springframework.http.ResponseEntity;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 /**
  * 全局异常处理器。
@@ -22,7 +25,8 @@ import org.springframework.http.ResponseEntity;
  * </ul>
  *
  * <p>匹配规则：抛异常时 Spring 挑「离异常类型最近」的那个方法。
- * 抛 BusinessException 就走 handleBusiness，不会被最后的 handleException 兜走。
+ * 抛 BusinessException 就走 handleBusiness，不会被最后的 handleException 兜走；
+ * 参数类型转不过去（MethodArgumentTypeMismatchException）走 handleBadRequest，同理。
  */
 @Slf4j
 @RestControllerAdvice
@@ -49,6 +53,31 @@ public class GlobalExceptionHandler {
         var fieldError = e.getBindingResult().getFieldError();
         String msg = (fieldError != null) ? fieldError.getDefaultMessage() : "参数错误";
         return ResponseEntity.badRequest().body(Result.error(400, msg));
+    }
+
+    /**
+     * 参数「格式不对」这一类。
+     *
+     * <p>和 handleValid 的分工：handleValid 管的是 @Valid 校验不通过（字段值不合法，
+     * 比如标题为空）；这里管的是**请求压根没被解析成方法参数** ——
+     * 路径 / 查询参数类型转不过去、必填参数没传、请求体不是合法 JSON。
+     *
+     * <p>为什么必须单独接：不接的话它们会落到最下面的 handleException，
+     * 变成 500「系统异常」。但这三种都是<b>调用方的问题</b>，本该是 400 ——
+     * 用户看到 500 会以为服务器挂了，你翻日志才发现是自己少传了一个参数。
+     *
+     * <p>自己试：浏览器打开 /dev-api/post/list?pageNum=abc，
+     * 加这段之前是 500，加之后是 400。
+     */
+    @ExceptionHandler({
+            MethodArgumentTypeMismatchException.class,       // /post/list?pageNum=abc
+            MissingServletRequestParameterException.class,   // /post/like 少传 postId
+            HttpMessageNotReadableException.class            // 请求体不是合法 JSON
+    })
+    public ResponseEntity<Result<Void>> handleBadRequest(Exception e) {
+        // 和 handleException 一样：细节只进日志，响应体里只给人话
+        log.warn("请求参数不合法：{}", e.getMessage());
+        return ResponseEntity.badRequest().body(Result.error(400, "参数格式不对"));
     }
 
     @ExceptionHandler(Exception.class)

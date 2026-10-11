@@ -97,6 +97,12 @@ public class UserController {
         // 拦截器解析时原样取出来
         String token = jwtUtil.generate(user.getId(), user.getUsername(), user.getRole());
 
-        return Result.success(new LoginVO(user.getId(), user.getUsername(), user.getRole(), token));
+        // 同时给 username 和 nickname：
+        //   username —— 稳定标识，前端拿它算头像配色、以后做 @handle
+        //   nickname —— 页面上真正显示的名字
+        // ⚠️ token 里只放 username，不放 nickname：昵称可以随时改，
+        //    签进 token 就意味着改完之后旧 token 还是老名字，得等过期才生效。
+        return Result.success(new LoginVO(
+                user.getId(), user.getUsername(), user.displayName(), user.getRole(), token));
     }
 }

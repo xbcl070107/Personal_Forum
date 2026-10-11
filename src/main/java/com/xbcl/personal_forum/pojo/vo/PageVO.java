@@ -60,4 +60,26 @@ public class PageVO<T> {
         vo.setPages(page.getPages());
         return vo;
     }
+
+    /**
+     * 边转换边包装：把 Page&lt;S&gt; 转成 PageVO&lt;T&gt;。
+     *
+     * <p>为什么需要它：查出来的是 Page&lt;Post&gt;，但要返回给前端的是
+     * PageVO&lt;PostVO&gt;（帖子要带上作者名）。没有这个重载的话，
+     * 每个 Service 方法都得手写一遍「建 vo、setRecords(转换后)、setTotal...
+     * setPages」这五行 —— 五行里有四个字段是纯搬运，抄五遍迟早抄漏一个，
+     * 而漏掉 total 的表现是「分页器永远显示 0 条」，不报错。
+     *
+     * <p>四个搬运字段（total / pageNum / pageSize / pages）在这里只写一次，
+     * 转换规则由调用方以 mapper 的形式传进来。
+     */
+    public static <S, T> PageVO<T> of(Page<S> page, java.util.function.Function<S, T> mapper) {
+        PageVO<T> vo = new PageVO<>();
+        vo.setRecords(page.getRecords().stream().map(mapper).toList());
+        vo.setTotal(page.getTotal());
+        vo.setPageNum(page.getCurrent());
+        vo.setPageSize(page.getSize());
+        vo.setPages(page.getPages());
+        return vo;
+    }
 }

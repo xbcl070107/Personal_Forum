@@ -26,7 +26,10 @@ DROP TABLE IF EXISTS `user`;
 -- ---------- 1. user 用户 ----------
 CREATE TABLE `user` (
     id            BIGINT       NOT NULL AUTO_INCREMENT           COMMENT '主键',
-    username      VARCHAR(32)  NOT NULL                          COMMENT '登录名',
+    username      VARCHAR(32)  NOT NULL                          COMMENT '登录名，唯一',
+    -- 昵称：展示用。故意**不建唯一键** —— 允许重名是需求，不是漏了。
+    -- 唯一性由上面的 username 负责，两者职责不要混。
+    nickname      VARCHAR(32)  NOT NULL                          COMMENT '昵称，展示用，允许重复',
     password_hash VARCHAR(100) NOT NULL                          COMMENT 'BCrypt 哈希后的密码，不存明文',
     role          VARCHAR(16)  NOT NULL DEFAULT 'USER'           COMMENT 'ADMIN / USER',
     created_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '注册时间',

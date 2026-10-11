@@ -34,28 +34,86 @@ export function statusOf(status) {
   return STATUS_MAP[status] || { text: '未知', type: 'info' }
 }
 
+/** 全站共用的一份头像色板：顶栏、帖子作者、评论作者都用它 */
+export const AVATAR_PALETTE = ['#2f5d8a', '#4a7c59', '#a4462f', '#b8892b', '#6b4f8a', '#3d7d7d']
+
 /**
- * 作者身份的「长相」——名字和颜色。
+ * 按名字算一个稳定的颜色。
  *
- * 【为什么需要它】
- * 后端的列表 / 详情接口只返回 userId 这个数字，没有作者名
- * （见 PostService.listApproved —— 返回的是裸 Post 实体）。
- * 而上一条帖子到底是谁发的，是列表里最该看见的信息之一：
- * 之前详情页直接写死了一个「冒险者」，等于所有帖子都是同一个人发的，
- * 这个信息就废了。
+ * <p>同一个人在哪都同一个色，靠的是「同一个名字算出同一个下标」。
+ * 这里只是把字符码加起来取模，不是正经哈希 —— 目的只是颜色稳定，
+ * 分布不均匀完全可以接受（多几个人撞色不算 bug）。
  *
- * 【为什么不去改后端】
- * 要真名就得给帖子接口做 VO、连 user 表查用户名 —— 那是后端的活，
- * 而且这个项目当前的学习重点是后端分层，前端不该为了显示一个名字
- * 就把接口形状改掉。所以这里退一步：由 userId 稳定地推出一张
- * 「同一作者永远同一个名字和颜色」的身份牌。
- *
- * 【为什么是确定的】
- * 同一个 userId 永远算出同一组结果，所以列表和详情里
- * 同一个作者长得一样，翻页也不会变脸。换个库、id 变了，
- * 名字跟着变 —— 这一点它比不上真名，是明知的取舍。
+ * <p>为什么按名字而不是按 userId：顶栏显示的是登录名、评论区给的也是
+ * 用户名，只有这里统一按名字算，同一个人在这三处的颜色才真的对得上。
  */
-const AUTHOR_NAMES = [
+export function avatarColorOf(name) {
+  const s = String(name || '')
+  if (!s) return '#6b6050'
+  let sum = 0
+  for (let i = 0; i < s.length; i += 1) sum += s.charCodeAt(i)
+  return AVATAR_PALETTE[sum % AVATAR_PALETTE.length]
+}
+
+/**
+ * 作者身份的「长相」——名字、首字、颜色。
+ *
+ * 【三个参数的分工】
+ * 后端现在会给两个名字，它们不是一回事：
+ *   nickname —— 展示名，**可以重复**。页面上要显示的就是它。
+ *   username —— 登录名，**唯一**。不显示，但用来把两个同名的人区分开。
+ *
+ * 【为什么头像色的键用 username 而不是 nickname】
+ * 昵称允许重复。拿昵称当哈希键的话，两个都叫「提灯人」的人会分到同一个颜色、
+ * 同一个首字，在列表里完全分不出来。username 唯一，用它做键才能保证
+ * 「同一个人永远同色」且「不同的人不会撞成一样」。
+ *
+ * 【为什么还留着按 userId 推名字的老逻辑】
+ * 兜底。老缓存里没有 nickname、后端字段改名、或者别的接口只给 userId 时，
+ * 至少页面不会显示 undefined，也不会崩。
+ *
+ * @param {number|string|null|undefined} userId
+ * @param {string} [nickname] 昵称，展示用，可重复
+ * @param {string} [username] 登录名，唯一，只用来算颜色
+ * @returns {{name: string, initial: string, color: string, isKnown: boolean}}
+ */
+export function authorOf(userId, nickname, username) {
+  const id = Number(userId)
+  const nick = typeof nickname === 'string' ? nickname.trim() : ''
+  const uname = typeof username === 'string' ? username.trim() : ''
+
+  // ① 有名字 —— 正常路径。昵称优先，昵称为空才退回用户名
+  if (nick || uname) {
+    const name = nick || uname
+    return {
+      name,
+      initial: name.charAt(0).toUpperCase(),
+      // 颜色键优先用唯一的 username
+      color: avatarColorOf(uname || nick),
+      isKnown: true,
+    }
+  }
+
+  // ② 什么名字都没有，也没有有效 id —— 给个中性身份，别显示 undefined
+  if (!Number.isFinite(id) || id <= 0) {
+    return { name: '匿名冒险者', initial: '匿', color: '#6b6050', isKnown: false }
+  }
+
+  // ③ 只有 id：退回推导。同一个人仍然稳定，只是名字未必是真名
+  const name = DERIVED_NAMES[id % DERIVED_NAMES.length]
+  return {
+    name,
+    initial: name.charAt(0),
+    color: avatarColorOf(name),
+    isKnown: true,
+  }
+}
+
+/**
+ * 只有 userId、没有用户名时的兜底名字表。
+ * 不是真实用户名，纯粹为了让页面别显示成一串数字。
+ */
+const DERIVED_NAMES = [
   '灰羽',
   '林间旅人',
   '铁匠的女儿',
@@ -67,26 +125,3 @@ const AUTHOR_NAMES = [
   '山雀',
   '提灯人',
 ]
-
-/** 和顶栏、评论区共用的一份色板，同一个人在哪都一个色 */
-export const AVATAR_PALETTE = ['#2f5d8a', '#4a7c59', '#a4462f', '#b8892b', '#6b4f8a', '#3d7d7d']
-
-/**
- * @param {number|string|null|undefined} userId
- * @returns {{name: string, initial: string, color: string, isKnown: boolean}}
- */
-export function authorOf(userId) {
-  const id = Number(userId)
-
-  // id 拿不到（老数据、字段改名）时退回一个中性身份，不要让页面崩掉或者显示 undefined
-  if (!Number.isFinite(id) || id <= 0) {
-    return { name: '匿名冒险者', initial: '匿', color: '#6b6050', isKnown: false }
-  }
-
-  return {
-    name: AUTHOR_NAMES[id % AUTHOR_NAMES.length],
-    initial: AUTHOR_NAMES[id % AUTHOR_NAMES.length].charAt(0),
-    color: AVATAR_PALETTE[id % AVATAR_PALETTE.length],
-    isKnown: true,
-  }
-}

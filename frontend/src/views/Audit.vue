@@ -3,7 +3,7 @@ import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import EmptyState from '../components/EmptyState.vue'
 import { auditPost, pendingPosts } from '../api/post'
-import { formatTime } from '../utils/format'
+import { formatTime, authorOf } from '../utils/format'
 
 /**
  * 审核台。只有管理员进得来 —— 路由守卫拦一道，后端 checkAdmin 再拦一道。
@@ -126,6 +126,20 @@ onMounted(load)
         </header>
 
         <div class="meta">
+          <!--
+            提交人。审核台最该看的就是这条 —— 同一个人反复提交垃圾内容，
+            不显示作者的话你根本发现不了，只能一份一份看正文。
+            username 来自后端 PostVO。
+          -->
+          <span class="who">
+            <i
+              class="avatar"
+              :style="{ background: authorOf(post.userId, post.nickname, post.username).color }"
+            >
+              {{ authorOf(post.userId, post.nickname, post.username).initial }}
+            </i>
+            {{ authorOf(post.userId, post.nickname, post.username).name }}
+          </span>
           <span class="no">NO.{{ post.id }}</span>
           <span>{{ formatTime(post.createdAt) }}</span>
         </div>
@@ -229,9 +243,35 @@ onMounted(load)
 
 .meta {
   display: flex;
+  align-items: center;
   gap: 14px;
   color: var(--c-ink-4);
   font-size: 12px;
+}
+
+/* ---- 提交人 ----
+   和首页列表里那个作者牌同一套做法，整站保持一致 */
+.who {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 500;
+  color: var(--c-ink-3);
+}
+
+.avatar {
+  display: grid;
+  place-items: center;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 600;
+  color: #fdf6e6;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
 }
 
 .no {

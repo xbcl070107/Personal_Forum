@@ -9,9 +9,10 @@
       // 冒充已登录：把 token 和用户塞进 localStorage，然后跳进应用。
       // hash 里的 /home 是 404 兜底，会被重定向到真正的首页。
       localStorage.setItem('token', 'fake-token-for-screenshot')
+      // nickname 也要给：顶栏显示的是昵称，只填 username 的话那块会是空的
       localStorage.setItem(
         'user',
-        JSON.stringify({ id: 1, username: 'xbcl', role: 'ADMIN' }),
+        JSON.stringify({ id: 1, username: 'xbcl', nickname: '禤布出来', role: 'ADMIN' }),
       )
       location.replace('/#' + (new URLSearchParams(location.search).get('to') || '/'))
     </script>

@@ -3,7 +3,6 @@ package com.xbcl.personal_forum.controller;
 import com.xbcl.personal_forum.common.BusinessException;
 import com.xbcl.personal_forum.common.Result;
 import com.xbcl.personal_forum.pojo.dto.PostPublishDTO;
-import com.xbcl.personal_forum.pojo.entity.Post;
 import com.xbcl.personal_forum.service.PostService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -16,6 +15,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.PathVariable;
 import com.xbcl.personal_forum.pojo.vo.PageVO;
+import com.xbcl.personal_forum.pojo.vo.PostVO;
+import org.springframework.web.bind.annotation.DeleteMapping;
 
 import java.util.List;
 
@@ -79,13 +80,17 @@ public class PostController {
      *
      * <p>GET /dev-api/post/pending
      * <br>请求头：Authorization: Bearer &lt;管理员的 token&gt;
-     * <br>响应体：{"code":200,"data":[{"id":3,"title":"...","status":0,...}],"message":"ok"}
+     * <br>响应体：{"code":200,"data":[{"id":3,"userId":4,"username":"林间旅人",
+     * "title":"...","status":0,...}],"message":"ok"}
+     *
+     * <p>返回的是 PostVO，比实体多一个 username —— 审核台要显示「谁提交的」，
+     * 只给 userId 的话前端只能猜名字。
      *
      * <p>路径写 "/pending" 而不是 "/list/pending"，是因为前面 @RequestMapping("/post")
      * 已经拼过一次了，完整地址是 /post/pending。
      */
     @GetMapping("/pending")
-    public Result<List<Post>> listPending(HttpServletRequest request) {
+    public Result<List<PostVO>> listPending(HttpServletRequest request) {
         // 先验权限，再干活。顺序反了的话，普通用户也能把待审内容拉出来。
         checkAdmin(request);
         return Result.success(postService.listPending());
@@ -123,10 +128,10 @@ public class PostController {
      * 想点进详情再登录。
      */
     @GetMapping("/list")
-    public Result<PageVO<Post>> list(@RequestParam(defaultValue = "1") long pageNum,
-                                     @RequestParam(defaultValue = "10") long pageSize,
-                                     // required = false：不传就是「全部板块」
-                                     @RequestParam(required = false) Long categoryId) {
+    public Result<PageVO<PostVO>> list(@RequestParam(defaultValue = "1") long pageNum,
+                                       @RequestParam(defaultValue = "10") long pageSize,
+                                       // required = false：不传就是「全部板块」
+                                       @RequestParam(required = false) Long categoryId) {
         return Result.success(postService.listApproved(pageNum, pageSize, categoryId));
     }
 
@@ -137,12 +142,29 @@ public class PostController {
      * <br>要登录。待审 / 驳回的帖，只有作者本人和管理员能看到。
      */
     @GetMapping("/{id}")
-    public Result<Post> detail(@PathVariable Long id, HttpServletRequest request) {
+    public Result<PostVO> detail(@PathVariable Long id, HttpServletRequest request) {
         Long userId = (Long) request.getAttribute("userId");
         String role = (String) request.getAttribute("role");
         return Result.success(postService.detail(id, userId, ROLE_ADMIN.equals(role)));
     }
 
+    /**
+     * 删帖。作者本人或管理员。
+     *
+     * <p>DELETE /dev-api/post/3
+     * <br>参数在路径里，没有请求体。
+     *
+     * <p>这里不调 checkAdmin：普通用户也要能删自己的帖。
+     * 「能不能删这条」的判断在 Service 里，靠条件版 eq 完成。
+     */
+    @DeleteMapping("/{id}")
+    public Result<Void> delete(@PathVariable Long id, HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
+        String role = (String) request.getAttribute("role");
+        postService.delete(id, userId, ROLE_ADMIN.equals(role));
+
+        return Result.success(null);
+    }
     /**
      * 我的帖子。四种状态都返回。
      *
@@ -150,12 +172,13 @@ public class PostController {
      * <br>userId 从 token 里取 —— 不能让前端传，不然谁都能翻别人的帖子。
      */
     @GetMapping("/my")
-    public Result<PageVO<Post>> my(@RequestParam(defaultValue = "1") long pageNum,
-                                   @RequestParam(defaultValue = "10") long pageSize,
-                                   HttpServletRequest request) {
+    public Result<PageVO<PostVO>> my(@RequestParam(defaultValue = "1") long pageNum,
+                                     @RequestParam(defaultValue = "10") long pageSize,
+                                     HttpServletRequest request) {
         Long userId = (Long) request.getAttribute("userId");
         return Result.success(postService.listMy(pageNum, pageSize, userId));
     }
+
 
     /**
      * 校验当前请求是不是管理员。

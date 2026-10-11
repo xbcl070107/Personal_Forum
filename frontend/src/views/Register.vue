@@ -15,7 +15,7 @@ import { register } from '../api/auth'
  */
 const router = useRouter()
 
-const form = ref({ username: '', password: '', confirm: '' })
+const form = ref({ username: '', nickname: '', password: '', confirm: '' })
 const loading = ref(false)
 
 /**
@@ -28,8 +28,8 @@ const mismatch = computed(
 )
 
 async function handleSubmit() {
-  if (!form.value.username || !form.value.password) {
-    ElMessage.warning('用户名和密码都要填')
+  if (!form.value.username || !form.value.nickname || !form.value.password) {
+    ElMessage.warning('用户名、昵称和密码都要填')
     return
   }
   if (form.value.password !== form.value.confirm) {
@@ -38,10 +38,11 @@ async function handleSubmit() {
   }
 
   loading.value = true
-  // 只把后端要的两个字段发过去。confirm 是前端自己用的，
+  // 只把后端要的三个字段发过去。confirm 是前端自己用的，
   // 发过去后端也没有这个字段，多余的数据只是噪音
   const res = await register({
     username: form.value.username,
+    nickname: form.value.nickname,
     password: form.value.password,
   })
   loading.value = false
@@ -69,13 +70,29 @@ async function handleSubmit() {
 
       <div class="auth-body">
         <el-form label-position="top" @submit.prevent @keyup.enter="handleSubmit">
+          <!--
+            用户名和昵称是两件事，所以在表单上也分开、并且各自写清用途：
+              username —— 登录凭证，全站唯一，不能重
+              nickname —— 展示名，会出现在帖子和评论上，允许重名
+            只写「用户名」两个字的话，用户会以为这就是他显示出来的名字，
+            等发现顶栏显示的是另一个才回头改。
+          -->
           <el-form-item label="用户名">
             <el-input
               v-model="form.username"
               size="large"
               maxlength="32"
-              placeholder="登记用的名字"
+              placeholder="登录用的账号，不能重复"
               autocomplete="username"
+            />
+          </el-form-item>
+
+          <el-form-item label="昵称">
+            <el-input
+              v-model="form.nickname"
+              size="large"
+              maxlength="32"
+              placeholder="别人看到的名字，可以重名"
             />
           </el-form-item>
 

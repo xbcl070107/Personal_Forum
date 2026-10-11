@@ -35,6 +35,32 @@ public class User {
     private String username;
 
     /**
+     * 昵称。给别人看的名，<b>允许重复</b> —— 表上没有唯一键，这是需求不是漏了。
+     *
+     * <p>和 username 的分工：
+     * <ul>
+     *   <li>username 是登录凭证，唯一，不显示给别人看</li>
+     *   <li>nickname 是展示名，页面上凡是「这个人叫什么」的地方都用它</li>
+     * </ul>
+     * 合在一起就会出现「我想叫提灯人，但已经有人叫了」这种死路。
+     */
+    private String nickname;
+
+    /**
+     * 页面上该显示什么名字。
+     *
+     * <p>兜底顺序是 nickname → username：正常情况 nickname 一定有值
+     * （列是 NOT NULL、注册时必填），所以这行主要是防止历史数据或
+     * 以后某个只填了 username 的写入路径，让页面出现一片空白。
+     *
+     * <p>放在实体上而不是各个 VO 里各写一遍 —— PostVO 和 CommentVO
+     * 都要用同一套规则，两处各写一份，将来改兜底顺序就会漏一处。
+     */
+    public String displayName() {
+        return (nickname == null || nickname.isBlank()) ? username : nickname;
+    }
+
+    /**
      * 密码的 BCrypt 哈希（一串 60 个字符的乱码），不是明文，也解不回明文。
      * 任何接口都别把它返回给前端 —— 前端要的只是 id / username / role。
      */

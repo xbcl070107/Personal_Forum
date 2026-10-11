@@ -69,6 +69,8 @@ public class UserService {
         // 2. 拼实体。密码只以 BCrypt 哈希的形式落库，明文既不入库也不打日志。
         User user = new User();
         user.setUsername(dto.getUsername());
+        // 昵称不查重 —— 允许和别人重名是需求。唯一性只由 username 负责
+        user.setNickname(dto.getNickname());
         user.setPasswordHash(passwordEncoder.encode(dto.getPassword()));
         user.setRole("USER");
 

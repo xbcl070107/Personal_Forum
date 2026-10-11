@@ -208,12 +208,19 @@ onMounted(() => {
           <div class="post-body">
             <h3 class="post-title">{{ post.title }}</h3>
             <div class="post-meta">
-              <!-- 作者身份牌：接口只给了 userId，名字由它稳定推导（见 utils/format.js） -->
+              <!--
+                作者身份牌。显示 nickname（昵称，可重复）；username（唯一）只用来算头像色，
+                免得两个撞昵称的人长得一模一样。
+                两个名字都来自后端 PostVO（Service 批量查 user 表回填）。
+              -->
               <span class="who">
-                <i class="avatar" :style="{ background: authorOf(post.userId).color }">
-                  {{ authorOf(post.userId).initial }}
+                <i
+                  class="avatar"
+                  :style="{ background: authorOf(post.userId, post.nickname, post.username).color }"
+                >
+                  {{ authorOf(post.userId, post.nickname, post.username).initial }}
                 </i>
-                {{ authorOf(post.userId).name }}
+                {{ authorOf(post.userId, post.nickname, post.username).name }}
               </span>
               <span v-if="categoryName[post.categoryId]" class="chip">
                 {{ categoryName[post.categoryId] }}

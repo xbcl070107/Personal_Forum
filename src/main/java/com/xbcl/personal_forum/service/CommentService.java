@@ -1,15 +1,13 @@
 package com.xbcl.personal_forum.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.xbcl.personal_forum.common.BusinessException;
 import com.xbcl.personal_forum.mapper.CommentMapper;
-import com.xbcl.personal_forum.mapper.PostMapper;
 import com.xbcl.personal_forum.mapper.UserMapper;
 import com.xbcl.personal_forum.pojo.dto.CommentPublishDTO;
 import com.xbcl.personal_forum.pojo.entity.Comment;
-import com.xbcl.personal_forum.pojo.entity.Post;
 import com.xbcl.personal_forum.pojo.entity.User;
 import com.xbcl.personal_forum.pojo.vo.CommentVO;
+import com.xbcl.personal_forum.pojo.vo.PostVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -24,11 +22,13 @@ import java.util.stream.Collectors;
  * <p>评论不做审核 —— 帖子有 status 是为了别让乱七八糟的东西上首页，
  * 评论挂在各自帖子下面，没有这个问题。所以这个类里没有审核相关的方法。
  *
- * <p>这里直接注入了 PostMapper 和 UserMapper，不是绕过了 PostService / UserService：
- * 发评论和看评论列表都要读 post 表校验「这条帖能不能被评论」、读 user 表拿作者名，
- * 这都是「查一条」，不需要业务层的方法。走 PostService.detail() 反而是错的 ——
- * 那个方法里带着「作者本人能看自己待审帖」的特例，拿它当校验用，
- * 等于放行了作者在自己还没过审的帖子下面自嗨。
+ * <p>三个依赖各有用途：CommentMapper 是评论本表；UserMapper 用来批量取作者名；
+ * PostService 只用来调 requireApproved —— 「这条帖游客看得见吗」这个前提全项目只留一份。
+ *
+ * <p>⚠️ 校验用 requireApproved，不用 detail()：detail 对作者本人和管理员是放行的，
+ * 拿它当校验，等于放行作者在自己还没过审的帖子下面自嗨。
+ * 以前这里自己抄了一份同样的判断（读 post 表 + 比 status），已经收口回 PostService ——
+ * 规则只有一处，以后改可见性不会漏掉评论这个入口。
  */
 @Service
 @RequiredArgsConstructor
@@ -36,8 +36,8 @@ public class CommentService {
 
     private final CommentMapper commentMapper;
 
-    /** 校验帖子状态要用到，所以这个 Service 直接读 post 表 */
-    private final PostMapper postMapper;
+    /** 只为了调 requireApproved，本类不碰任何帖子数据 */
+    private final PostService postService;
 
     /** 评论列表要显示作者名，所以这里也要读 user 表 */
     private final UserMapper userMapper;
@@ -53,9 +53,9 @@ public class CommentService {
     public Long publish(CommentPublishDTO dto, Long userId) {
 
         // 帖子必须存在、且已经通过审核，否则不给评论。
-        // 这两关收在 getVisiblePost 里，和下面 listByPost 用的是同一份 ——
+        // 这一关收在 PostService.requireApproved 里，和下面 listByPost 用的是同一份 ——
         // 校验只写一遍，以后改规则不会漏掉另一个入口。
-        getVisiblePost(dto.getPostId());
+        postService.requireApproved(dto.getPostId());
 
         // 组装实体，只设这三个字段。
         // id 交给自增；isDeleted 和 createdAt 留 null —— MyBatis-Plus 的 insert
@@ -81,7 +81,7 @@ public class CommentService {
     public List<CommentVO> listByPost(Long postId) {
 
         // 和发评论同一道关：帖子不可见，它下面的评论也不该被看见
-        getVisiblePost(postId);
+        postService.requireApproved(postId);
 
         // ① 查评论。正序：评论区是对话，得从旧读到新。
         // 第二行 orderByAsc(id) 是兜底 —— created_at 只精确到秒，
@@ -113,51 +113,34 @@ public class CommentService {
         // User 实体永远不直接返回给前端，一次都不行。
         List<User> users = userMapper.selectBatchIds(userIds);
 
-        // 收成 Map<用户id, 用户名>，下面组装时从内存取，不再碰数据库
-        Map<Long, String> usernameMap = users.stream()
-                .collect(Collectors.toMap(User::getId, User::getUsername));
+        // 收成 Map<用户id, User>，下面组装时从内存取，不再碰数据库。
+        // 存整个 User 而不是只存用户名：评论区要显示 nickname（展示名），
+        // 同时还要 username 给前端算头像配色 —— 两个字段都在这一个对象上，
+        // 存两份 Map 等于把同一个查询做两遍。
+        Map<Long, User> userMap = users.stream()
+                .collect(Collectors.toMap(User::getId, user -> user));
 
         // ③ 组装 VO
         return comments.stream().map(comment -> {
             CommentVO vo = new CommentVO();
             vo.setId(comment.getId());
             vo.setUserId(comment.getUserId());
+
             // 兜底：作者被物理删除时 Map 里没这个人，给句「已注销」，
-            // 别让前端显示 null
-            vo.setUsername(usernameMap.getOrDefault(comment.getUserId(), "已注销"));
+            // 别让前端显示 null。两个名字字段都要给，否则前端那一处会显示空白
+            User author = userMap.get(comment.getUserId());
+            if (author == null) {
+                vo.setUsername(PostVO.UNKNOWN_AUTHOR);
+                vo.setNickname(PostVO.UNKNOWN_AUTHOR);
+            } else {
+                vo.setUsername(author.getUsername());
+                // displayName() 自带「昵称为空退回 username」的兜底
+                vo.setNickname(author.displayName());
+            }
+
             vo.setContent(comment.getContent());
             vo.setCreatedAt(comment.getCreatedAt());
             return vo;
         }).toList();
-    }
-
-    /**
-     * 检查一条帖子「对外可见吗」，不可见就抛 404。
-     *
-     * <p>抽出来是因为发评论（publish）和看评论列表（listByPost）都要过这一关 ——
-     * 复制两份的话，以后规则变了（比如加一条「作者本人可以看自己待审帖的评论」），
-     * 你会只改一处，另一处变成口子。
-     *
-     * <p>里面那句 selectById 查不到是返回 null、不是抛异常 —— 这是 MyBatis-Plus
-     * 和 JPA 的 getById 最大的区别。别用 try/catch 包它：那样连「数据库连不上」
-     * 都会被翻译成「帖子不存在」，真出故障时你会对着错误的提示查一晚上。
-     *
-     * @return 校验通过的帖子，调用方不用就忽略
-     */
-    private Post getVisiblePost(Long postId) {
-
-        Post post = postMapper.selectById(postId);
-        if (post == null) {
-            throw new BusinessException(404, "帖子不存在");
-        }
-
-        // 回 404 不回 403：403 等于承认「这个 id 存在，只是不给你看」，
-        // 拿 id 从 1 数到 100 就能把别人的待审帖全摸出来。
-        // 和 PostService.detail 同一个口径。
-        if (post.getStatus() != Post.STATUS_APPROVED) {
-            throw new BusinessException(404, "帖子不存在");
-        }
-
-        return post;
     }
 }

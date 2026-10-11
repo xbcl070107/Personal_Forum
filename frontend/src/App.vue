@@ -3,6 +3,7 @@ import { computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from './store/user'
+import { avatarColorOf } from './utils/format'
 
 /**
  * 根组件：顶部导航 + 下面那块会变的区域。
@@ -40,29 +41,28 @@ const navItems = computed(() => {
   return items
 })
 
-/** 用户名首字母，画在徽记里。没登录时看不到这个圈，给个问号占位 */
+/**
+ * 徽记里那个字：取**昵称**的首字，不是用户名的。
+ *
+ * 页面上显示的是昵称，徽记却显示用户名的首字，就会出现
+ * 「圈里是 x、旁边写着禤布出来」这种对不上的情况。
+ */
 const initial = computed(() => {
-  const name = userStore.user?.username || ''
+  const name = userStore.displayName
   return name ? name.charAt(0).toUpperCase() : '?'
 })
 
 /**
- * 徽记配色：由用户名算出来，同一个人永远是同一个色。
+ * 徽记配色：由**用户名**算出来（唯一），不用昵称。
  *
- * 这里只是把字符码加起来取模，不是正经哈希 —— 目的只是「颜色稳定」，
- * 用户名变了颜色跟着变完全可以接受，所以不用追求分布均匀。
- * 色板和评论区的头像是同一份，同一个人在哪儿都长一个样。
+ * 昵称允许重复，两个人撞昵称时颜色会一模一样，列表里就分不出来了。
+ * 用户名唯一，拿它做键才能保证「同一个人永远同色、不同的人不撞色」。
+ *
+ * 算法收在 utils/format.js 的 avatarColorOf —— 顶栏 / 帖子作者 / 评论作者
+ * 全站共用这一个函数。
  */
-const AVATAR_PALETTE = ['#2f5d8a', '#4a7c59', '#a4462f', '#b8892b', '#6b4f8a', '#3d7d7d']
-
-function avatarColor(name) {
-  let sum = 0
-  for (let i = 0; i < name.length; i += 1) sum += name.charCodeAt(i)
-  return AVATAR_PALETTE[sum % AVATAR_PALETTE.length]
-}
-
 const avatarStyle = computed(() => ({
-  background: avatarColor(userStore.user?.username || ''),
+  background: avatarColorOf(userStore.user?.username || userStore.displayName),
 }))
 
 /**
@@ -137,9 +137,14 @@ watch(
             </router-link>
 
             <!-- 会员木牌：徽记 + 名字。管理员多一枚金色小印 -->
-            <span class="who" :title="userStore.user?.username">
+            <!--
+              会员木牌：徽记 + 昵称。管理员多一枚金色小印。
+              显示的是 nickname（昵称，可重复），悬停才露出 username（登录名，唯一）——
+              昵称可能会撞，想确认「到底是哪个账号」时用它。
+            -->
+            <span class="who" :title="`@${userStore.user?.username || ''}`">
               <span class="avatar" :style="avatarStyle">{{ initial }}</span>
-              <span class="who-name">{{ userStore.user?.username }}</span>
+              <span class="who-name">{{ userStore.displayName }}</span>
               <span v-if="userStore.isAdmin" class="badge-admin">管理员</span>
             </span>
 
