@@ -46,3 +46,17 @@ mybatis-plus:
   # 以后要写自定义 XML 时，放到 src/main/resources/mapper/ 下面，再把下面这行放开。
   # 现在没这个目录，先留着注释，免得启动时找不到路径反而报错。
   # mapper-locations: classpath*:/mapper/**/*.xml
+
+# ============================================================
+# Swagger / OpenAPI 接口文档
+# 这里不需要放任何配置，默认值就是本地开发想要的样子。
+# 依赖和实现说明见 config/OpenApiConfig.java；启动后打开：
+#   http://localhost:9090/dev-api/swagger-ui.html
+# ============================================================
+# 以后部署到公网时，别把文档一起放出去 —— 在 application-prod.yaml 里加这几行关掉：
+#
+# springdoc:
+#   api-docs:
+#     enabled: false    # 关掉 /v3/api-docs 这份 JSON
+#   swagger-ui:
+#     enabled: false    # 关掉 /swagger-ui.html 这个页面

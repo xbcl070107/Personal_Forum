@@ -45,12 +45,16 @@ public class WebMvcConfig implements WebMvcConfigurer {
      * 写成 {@code /dev-api/auth/login} 的现象是：登录接口也被要求带 token，
      * 于是你永远拿不到 token，整个链路卡死在第一步。
      *
-     * <p>白名单里这三个各自的理由：
+     * <p>白名单里这几个各自的理由：
      * <ul>
      *   <li>/auth/register、/auth/login —— 还没登录的人当然没有 token</li>
      *   <li>/category/list —— 板块下拉框，游客也要能看</li>
+     *   <li>/post/list —— 帖子列表，游客可见</li>
+     *   <li>/v3/api-docs/**、/swagger-ui/** 等 —— Swagger 文档页自己发的请求，
+     *       它们不带 token；不放行的现象是文档页一直提示
+     *       "Failed to load API definition"</li>
      * </ul>
-     * 以后加「帖子列表」「帖子详情」这类游客可见的接口时，记得往这里补一行。
+     * 以后加「帖子详情」这类游客可见的接口时，记得往这里补一行。
      */
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
@@ -61,7 +65,16 @@ public class WebMvcConfig implements WebMvcConfigurer {
                         "/auth/register",
                         "/auth/login",
                         "/category/list",
-                        "/post/list"        // 帖子列表，游客可见
+                        "/post/list",       // 帖子列表，游客可见
+
+                        // ---- Swagger / OpenAPI 文档（配置见 config/OpenApiConfig）----
+                        // 这几条不放行的话：文档页能打开，但页面去拉 /v3/api-docs 的 JSON 时
+                        // 会被这个拦截器 401 掉，界面上一直报 "Failed to load API definition"。
+                        // 和上面几条一样，这里写的是去掉 /dev-api 之后的部分。
+                        "/v3/api-docs/**",  // OpenAPI 文档 JSON（springdoc 生成）
+                        "/swagger-ui/**",   // Swagger UI 的静态资源（js / css）
+                        "/swagger-ui.html", // 文档页入口（会跳转到 /swagger-ui/index.html）
+                        "/webjars/**"       // Swagger UI 依赖的前端库（webjar 里的）
                 );
     }
 }

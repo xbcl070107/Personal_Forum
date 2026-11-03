@@ -187,6 +187,24 @@
             <scope>runtime</scope>
         </dependency>
 
+        <!-- ==================== 接口文档（Swagger / OpenAPI） ==================== -->
+        <!-- 作用：项目启动时自动扫描所有 @RestController，生成一份 OpenAPI 3 文档，
+             并自带一个 Swagger UI 网页 —— 浏览器里能看接口说明，也能直接点着发请求。
+             本地启动后访问（注意 /dev-api 是 context-path）：
+               http://localhost:9090/dev-api/swagger-ui.html   ← 文档页面
+               http://localhost:9090/dev-api/v3/api-docs       ← 文档 JSON 原文
+             标题、JWT 授权（Authorize 按钮）等配置见 config/OpenApiConfig.java。 -->
+        <!-- ⚠️ 版本必须自己写：Spring Boot 的父 POM 不管理 springdoc 的版本。 -->
+        <!-- ⚠️ 版本对应关系：Spring Boot 4.x → springdoc 3.x（3.1.1 的父 POM 就是 Boot 4.1.0）；
+                Spring Boot 3.x → springdoc 2.x。网上大量教程里的 springfox（Swagger 2 时代）
+                早就停止维护了，在 Spring 6/7 下不兼容，不要照抄。 -->
+        <!-- 这个 starter 已经包含文档生成器 + Swagger UI 的静态资源，不用再引别的包。 -->
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <version>3.1.1</version>
+        </dependency>
+
     </dependencies>
 
     <!--
