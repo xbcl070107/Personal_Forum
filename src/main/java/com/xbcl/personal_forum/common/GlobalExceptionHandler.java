@@ -80,6 +80,25 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(Result.error(400, "参数格式不对"));
     }
 
+    /**
+     * 上传的文件太大。
+     *
+     * <p>这个异常是 <b>Tomcat / Spring 在进 Controller 之前</b>抛的：
+     * 请求体一超过 spring.servlet.multipart.max-file-size，文件根本没被完整读进来，
+     * FileService 里那道 "> 5MB" 的判断也就永远轮不到执行。
+     * 不单独接的话会落到 handleException，变成 500「系统异常」——
+     * 但这明明是"你传的文件太大"，该是 400，而且要说清楚为什么。
+     *
+     * <p>注意 Spring Boot 3 抛的具体类型是 MaxUploadSizeExceededException，
+     * 它是 MultipartException 的子类，所以这里按父类接，
+     * 顺便把"multipart 内容解析失败"这一类也一起收了。
+     */
+    @ExceptionHandler(org.springframework.web.multipart.MultipartException.class)
+    public ResponseEntity<Result<Void>> handleMultipart(Exception e) {
+        log.warn("上传请求被拒绝：{}", e.getMessage());
+        return ResponseEntity.badRequest().body(Result.error(400, "图片不能超过 5MB"));
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Result<Void>> handleException(Exception e) {
         log.error("系统异常", e);

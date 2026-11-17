@@ -166,7 +166,7 @@ async function handleSubmit() {
   padding: 26px 28px 22px;
   text-align: center;
   color: #4a3410;
-  background: linear-gradient(150deg, #f0d89a, #d9b25e);
+  background: var(--c-gold-soft);
 }
 
 .auth-banner::after {
@@ -176,7 +176,7 @@ async function handleSubmit() {
   width: 210px;
   height: 210px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.5), transparent 70%);
+  background: none;
   pointer-events: none;
 }
 
@@ -202,7 +202,7 @@ async function handleSubmit() {
   font-family: var(--font-display);
   font-size: 22px;
   font-weight: 700;
-  background: linear-gradient(135deg, #4a7c9c, #24476b);
+  background: var(--c-primary-dark);
   color: #fdf6e6;
   box-shadow:
     inset 0 0 0 1px rgba(255, 255, 255, 0.4),

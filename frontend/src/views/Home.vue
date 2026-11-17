@@ -253,14 +253,13 @@ onMounted(() => {
           </p>
           <el-button
             v-if="!userStore.isLogin"
-            type="primary"
-            round
+            plain
             class="side-btn"
             @click="router.push('/register')"
           >
             登记入会
           </el-button>
-          <el-button v-else type="primary" round class="side-btn" @click="router.push('/publish')">
+          <el-button v-else plain class="side-btn" @click="router.push('/publish')">
             写一份新委托
           </el-button>
         </div>
@@ -281,59 +280,32 @@ onMounted(() => {
 <style scoped>
 /* ---- 告示牌 ----
    暖纸底 + 右上角一圈金光，右边缘压一道金线，像一块镶边挂起来的木牌 */
+/* ---- 刊头 ----
+   不画成卡片：一整块纸上的大标题，靠下面的横线收尾。
+   首页第一屏是全站唯一的「封面」，值得留白，不需要装饰。 */
 .hero {
   position: relative;
-  overflow: hidden;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
   gap: 24px;
-  padding: 30px 40px 28px;
-  margin-bottom: 18px;
-  border-radius: 16px;
-  background: linear-gradient(135deg, rgba(255, 253, 248, 0.97), rgba(245, 237, 220, 0.92));
-  border: 1px solid var(--c-line-strong);
-  /* 右边一道金色竖边 + 上面一条受光高光：像一块挂起来、镶了铜边的木牌 */
-  box-shadow:
-    inset -4px 0 0 rgba(184, 137, 43, 0.4),
-    inset 0 1px 0 rgba(255, 255, 255, 0.85),
-    var(--shadow-md);
+  padding: 6px 0 30px;
+  margin-bottom: 26px;
+  border-bottom: 1px solid var(--c-line-strong);
 }
 
-/* 左侧一道墨蓝竖条，和金边呼应，整块告示牌不至于只有暖色 */
-.hero::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 4px;
-  background: linear-gradient(180deg, var(--c-primary-light), var(--c-primary-dark));
-}
-
-/* 右上角的光晕 */
-.hero::after {
-  content: '';
-  position: absolute;
-  right: -70px;
-  top: -90px;
-  width: 260px;
-  height: 260px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(184, 137, 43, 0.24), transparent 68%);
-  pointer-events: none;
-}
+/* 原来的左侧竖条和右上角光晕都去掉了：刊头只靠字的大小和那条横线立住 */
 
 .hero-badge {
   display: inline-block;
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.16em;
-  color: #7d5a14;
-  background: var(--c-gold-soft);
+  color: var(--c-gold);
+  background: transparent;
   border: 1px solid var(--c-gold-line);
-  padding: 3px 11px;
-  border-radius: var(--radius-full);
+  padding: 3px 9px;
+  border-radius: var(--radius-sm);
 }
 
 .hero h1 {
@@ -342,12 +314,10 @@ onMounted(() => {
   letter-spacing: 0.04em;
 }
 
-/* em 用墨蓝 + 一条金色记号笔，在标题里挑一个词强调 */
+/* em 只换颜色，不画记号笔：一行字里有一个词变了颜色就够醒目 */
 .hero h1 em {
   font-style: normal;
   color: var(--c-primary);
-  background: linear-gradient(transparent 62%, rgba(217, 178, 94, 0.55) 62%);
-  padding: 0 2px;
 }
 
 .hero p {
@@ -398,14 +368,9 @@ onMounted(() => {
   gap: 12px;
   padding: 12px 16px;
   margin-bottom: 14px;
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius);
   background: var(--c-surface);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
   border: 1px solid var(--c-line);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.7),
-    var(--shadow-sm);
   overflow-x: auto;
 }
 
@@ -491,14 +456,9 @@ onMounted(() => {
   gap: 14px;
   padding: 16px 18px 16px 22px;
   margin-bottom: 10px;
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius);
   background: var(--c-surface);
-  backdrop-filter: saturate(140%) blur(10px);
-  -webkit-backdrop-filter: saturate(140%) blur(10px);
   border: 1px solid var(--c-line);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.7),
-    var(--shadow-sm);
   cursor: pointer;
   overflow: hidden;
   transition:
@@ -517,13 +477,10 @@ onMounted(() => {
   border-radius: 0 3px 3px 0;
 }
 
-/* 悬停：整条抬起 2px，边框镀金，右侧箭头滑出来 */
+/* 悬停：不动位置，只把边框和底色压深一档，右侧箭头滑出来 */
 .post:hover {
-  transform: translateY(-2px);
-  border-color: var(--c-gold-line);
-  box-shadow:
-    var(--shadow-lg),
-    inset 0 0 0 1px var(--c-gold-ring);
+  border-color: var(--c-line-strong);
+  background: var(--c-surface-solid);
 }
 
 .post:hover .post-title {
@@ -595,11 +552,11 @@ onMounted(() => {
 
 /* 板块小印 */
 .chip {
-  padding: 1px 9px;
-  border-radius: var(--radius-full);
-  background: var(--c-gold-soft);
-  color: #7d5a14;
-  border: 1px solid rgba(184, 137, 43, 0.24);
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--c-gold);
+  border: 1px solid var(--c-gold-line);
   font-weight: 500;
   font-size: 11.5px;
 }

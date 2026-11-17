@@ -1,9 +1,13 @@
 package com.xbcl.personal_forum.config;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
+import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+
+import java.nio.file.Paths;
 
 /**
  * Web 层配置。拦截器在这里「报备」，真正的拦截逻辑在 JwtInterceptor 里。
@@ -15,8 +19,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
  * <p>@Configuration 表示这是一个配置类，Spring 启动时会读它；
  * 实现 WebMvcConfigurer 是「我要改 Spring MVC 的默认行为」的标准做法。
  * 这个接口还有很多别的可重写方法，以后前端联调要用的跨域
- * （addCorsMappings）、上传图片要用的静态资源映射（addResourceHandlers）
- * 也都写在同一个类里。
+ * （addCorsMappings）也写在同一个类里。
  *
  * <p>@RequiredArgsConstructor 是 Lombok 的：它会给下面那个 final 字段
  * 生成一个构造器，Spring 看到构造器就知道要注入什么，
@@ -27,6 +30,15 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 public class WebMvcConfig implements WebMvcConfigurer {
 
     private final JwtInterceptor jwtInterceptor;
+
+    /**
+     * 上传图片落盘的根目录，和 FileService 读的是同一个配置项。
+     *
+     * <p>为什么不直接把路径写死成 {@code ./uploads}：部署时目录很可能不在
+     * 工作目录下（挂载盘、别的分区），写死之后只能改代码重新打包。
+     */
+    @Value("${forum.upload.dir:./uploads}")
+    private String uploadDir;
 
     /**
      * 注册拦截器。整个方法就在回答三个问题：装哪个、管哪些、放哪些。
@@ -50,6 +62,10 @@ public class WebMvcConfig implements WebMvcConfigurer {
      *   <li>/auth/register、/auth/login —— 还没登录的人当然没有 token</li>
      *   <li>/category/list —— 板块下拉框，游客也要能看</li>
      *   <li>/post/list —— 帖子列表，游客可见</li>
+     *   <li>/item/category/list —— 集市的分类 tab，游客可见</li>
+     *   <li>/uploads/** —— 图片是页面里 &lt;img src&gt; 直接请求的，
+     *       浏览器发这个请求<b>不会带 Authorization 头</b>，
+     *       不放行的话所有图片都是 401 的灰框</li>
      *   <li>/v3/api-docs/**、/swagger-ui/** 等 —— Swagger 文档页自己发的请求，
      *       它们不带 token；不放行的现象是文档页一直提示
      *       "Failed to load API definition"</li>
@@ -65,7 +81,10 @@ public class WebMvcConfig implements WebMvcConfigurer {
                         "/auth/register",
                         "/auth/login",
                         "/category/list",
-                        "/post/list",       // 帖子列表，游客可见
+                        "/post/list",        // 帖子列表，游客可见
+                        "/item/category/list", // 商品分类 tab，游客可见
+                        "/item/list",        // 集市列表，游客可见（W3；接口已挂上，逻辑在 ItemService.listMarket 待实现）
+                        "/uploads/**",       // 上传的图片，由下面 addResourceHandlers 直接吐文件
 
                         // ---- Swagger / OpenAPI 文档（配置见 config/OpenApiConfig）----
                         // 这几条不放行的话：文档页能打开，但页面去拉 /v3/api-docs 的 JSON 时
@@ -76,5 +95,38 @@ public class WebMvcConfig implements WebMvcConfigurer {
                         "/swagger-ui.html", // 文档页入口（会跳转到 /swagger-ui/index.html）
                         "/webjars/**"       // Swagger UI 依赖的前端库（webjar 里的）
                 );
+    }
+
+    /**
+     * 把「/uploads/** 这个 URL」映射到「磁盘上的上传目录」。
+     *
+     * <p>没有这段，FileService 返回的 URL 打开就是 404 —— 文件明明在磁盘上，
+     * 但没有一个 Controller 认领这个路径。Spring 的静态资源处理可以直接
+     * 把 URL 接到目录上，不用为此写一个读文件、写响应的 Controller。
+     *
+     * <p>三个细节：
+     * <ul>
+     *   <li>location 必须是 {@code file:} 前缀。不写会被当成 classpath 路径，
+     *       于是去 jar 里找 uploads 目录，永远找不到</li>
+     *   <li>路径要 <b>绝对化 + 归一化</b>：{@code ./uploads} 在不同工作目录下
+     *       指向不同地方，绝对化之后行为才是确定的</li>
+     *   <li>末尾那个 "/" 不能丢。少了它不是"映射到 uploads"，而是
+     *       "映射到名为 uploads 的资源"，子路径匹配全部失效</li>
+     * </ul>
+     */
+    @Override
+    public void addResourceHandlers(ResourceHandlerRegistry registry) {
+        String location = Paths.get(uploadDir)
+                .toAbsolutePath()
+                .normalize()
+                .toUri()
+                .toString();
+        // toUri() 对「还不存在的目录」不会补末尾斜杠，这里手动保证
+        if (!location.endsWith("/")) {
+            location = location + "/";
+        }
+
+        registry.addResourceHandler("/uploads/**")
+                .addResourceLocations(location);
     }
 }

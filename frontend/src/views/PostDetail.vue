@@ -419,7 +419,7 @@ onMounted(async () => {
 .count {
   min-width: 26px;
   padding: 1px 9px;
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-sm);
   text-align: center;
   font-size: 12px;
   font-weight: 600;

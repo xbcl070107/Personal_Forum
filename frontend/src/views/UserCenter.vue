@@ -379,7 +379,7 @@ onMounted(load)
   flex-shrink: 0;
   padding: 5px 10px;
   border: 1px solid transparent;
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-sm);
   background: none;
   font-family: inherit;
   font-size: 12px;

@@ -7,6 +7,7 @@ import com.xbcl.personal_forum.mapper.CategoryMapper;
 import com.xbcl.personal_forum.mapper.PostMapper;
 import com.xbcl.personal_forum.mapper.UserMapper;
 import com.xbcl.personal_forum.pojo.dto.PostPublishDTO;
+import com.xbcl.personal_forum.pojo.entity.Category;
 import com.xbcl.personal_forum.pojo.entity.Post;
 import com.xbcl.personal_forum.pojo.entity.User;
 import lombok.RequiredArgsConstructor;
@@ -106,7 +107,12 @@ public class PostService {
         // 1. 板块得真的存在。post 表上没建外键约束（建了删板块会很麻烦），
         //    所以「categoryId 是不是有效」得自己在代码里看，
         //    不然能发出一条 category_id 指向空气的帖子，详情页会查不到板块名。
-        if (categoryMapper.selectById(dto.getCategoryId()) == null) {
+        //
+        //    W2 之后还要看 scope：category 表现在同时装着帖子板块（POST）
+        //    和商品分类（ITEM），只判"存在"的话，前端把 categoryId 传成
+        //    "数码"那个 id 也能发帖成功，论坛首页就会出现一条挂着商品分类的帖子。
+        Category category = categoryMapper.selectById(dto.getCategoryId());
+        if (category == null || !Category.SCOPE_POST.equals(category.getScope())) {
             throw new BusinessException("板块不存在");
         }
 

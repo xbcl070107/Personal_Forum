@@ -12,6 +12,26 @@ spring:
   profiles:
     active: local
 
+  # ---- 图片上传的大小限制（W2 的 /file/upload）----
+  # 这一层是 Tomcat 在读请求体时就挡住的，所以「超限」根本走不到 Controller：
+  # 超过 max-file-size 会抛 MaxUploadSizeExceededException（见 GlobalExceptionHandler）。
+  # FileService 里也有一道 5MB 的判断，两道都要改 ——
+  # 这里管的是"请求根本别进来"，那边管的是"万一改了这个配置，业务层也别放过"。
+  servlet:
+    multipart:
+      max-file-size: 5MB        # 单个文件
+      max-request-size: 10MB    # 整个 multipart 请求（预留多图上传场景）
+
+# ---- 业务自己的配置 ----
+forum:
+  upload:
+    # 图片存哪儿。相对路径是相对「启动时的工作目录」（用 IDE 起就是项目根目录）。
+    # 这个目录不在 git 里（.gitignore 有 uploads/），换机器时是空的，重建即可。
+    dir: ./uploads
+    # 返回给前端的 URL 前缀。必须包含 context-path（/dev-api），
+    # 否则前端拿到 /uploads/xxx.jpg 去请求会是 404 —— 真正的地址是 /dev-api/uploads/xxx.jpg
+    url-prefix: /dev-api/uploads
+
 mybatis-plus:
   configuration:
     # 库里的 sort_order / created_at 自动映射到 Java 的 sortOrder / createdAt。

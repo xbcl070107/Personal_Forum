@@ -169,38 +169,30 @@ watch(
       <span class="footer-ornament"><i></i></span>
       <p class="footer-text">
         冒险者协会 · 记录每一次出发
-        <span class="footer-sub">Vue 3 · Element Plus · Spring Boot</span>
       </p>
     </footer>
   </div>
 </template>
 
 <style scoped>
-/* 撑满整屏的竖排布局：main 用 flex:1 顶开，页脚才会始终贴底，
-   内容少的时候不会浮在半空 */
+/* 撑满整屏的竖排布局：main 用 flex:1 顶开，页脚始终贴底 */
 .app {
   min-height: 100%;
   display: flex;
   flex-direction: column;
 }
 
-/* ---- 门楣 ----
-   除了那条金线底边，顶上加一层很淡的冷光：
-   整条顶栏是暖底，只有金色会显得寡淡，掺一点墨蓝才立得住。 */
+/*
+ * ---- 门楣 ----
+ * 平涂纸底 + 一条底线。没有光晕、没有金线、没有模糊：
+ * 顶栏是「页眉」，不是招牌，越安静越好。
+ */
 .topbar {
   position: sticky;
   top: 0;
   z-index: 10;
-  background:
-    radial-gradient(520px 90px at 22% 0%, rgba(47, 93, 138, 0.07), transparent 70%),
-    rgba(251, 246, 234, 0.84);
-  backdrop-filter: saturate(160%) blur(14px);
-  -webkit-backdrop-filter: saturate(160%) blur(14px);
-  border-bottom: 1px solid var(--c-line);
-  /* 底边压一条金线：像木牌下沿镶的铜条 */
-  box-shadow:
-    inset 0 -1px 0 rgba(184, 137, 43, 0.28),
-    0 1px 12px -6px rgba(74, 58, 34, 0.3);
+  background: var(--c-bg);
+  border-bottom: 1px solid var(--c-line-strong);
 }
 
 .topbar-inner {
@@ -214,40 +206,36 @@ watch(
   gap: 16px;
 }
 
-/* ---- 徽记 ---- */
+/* ---- 徽记：一方描边的印章。悬停才填实 ---- */
 .brand {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 11px;
   cursor: pointer;
   user-select: none;
   flex-shrink: 0;
 }
 
-/*
- * 火漆印：墨蓝渐变方块 + 金色内描边，里面一个「协」字。
- * box-shadow 的第一段是 inset —— 内描边，做出印章压过的立体感。
- */
 .brand-mark {
-  width: 34px;
-  height: 34px;
-  border-radius: 11px;
+  width: 30px;
+  height: 30px;
   display: grid;
   place-items: center;
-  color: #fdf6e6;
+  border: 1px solid var(--c-primary);
+  border-radius: var(--radius-sm);
+  color: var(--c-primary);
   font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 17px;
+  font-weight: 600;
+  font-size: 16px;
   line-height: 1;
-  background: linear-gradient(135deg, #3a6f9c, #223f5c);
-  box-shadow:
-    inset 0 0 0 1px rgba(217, 178, 94, 0.6),
-    0 4px 12px -4px rgba(47, 93, 138, 0.55);
-  transition: transform var(--t) var(--ease);
+  transition:
+    background-color var(--t) var(--ease),
+    color var(--t) var(--ease);
 }
 
 .brand:hover .brand-mark {
-  transform: rotate(-8deg) scale(1.06);
+  background: var(--c-primary);
+  color: var(--c-surface-solid);
 }
 
 .brand-text {
@@ -260,15 +248,15 @@ watch(
   font-family: var(--font-display);
   font-size: 16px;
   font-weight: 600;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.02em;
   color: var(--c-ink);
 }
 
-/* 英文小字做副题，字距拉开，像正规出版物的落款 */
+/* 英文小字做副题，字距拉开，像出版物的落款 */
 .brand-text small {
   font-size: 8.5px;
-  letter-spacing: 0.2em;
-  color: var(--c-gold);
+  letter-spacing: 0.22em;
+  color: var(--c-ink-4);
   font-weight: 600;
 }
 
@@ -276,18 +264,16 @@ watch(
 .nav {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
 }
 
-/* 自己写而不用 el-button：默认 / 悬停 / 当前栏目这三种状态都要各自的样子，
-   用组件库的按钮改起来更绕 */
 .nav-link {
   position: relative;
-  padding: 8px 12px;
-  border-radius: 9px;
+  padding: 8px 11px;
+  border-radius: var(--radius-sm);
   font-size: 14px;
   font-weight: 500;
-  color: var(--c-ink-2);
+  color: var(--c-ink-3);
   transition:
     background var(--t) var(--ease),
     color var(--t) var(--ease);
@@ -296,50 +282,47 @@ watch(
 .nav-link:hover {
   background: var(--c-primary-soft);
   color: var(--c-primary);
+  text-decoration: none;
 }
 
-/* 当前栏目：浅墨底 + 墨蓝字 + 一条金色小横杠 */
+/* 当前栏目：一行字 + 一条压在底边的实线 */
 .nav-link.active {
-  color: var(--c-primary);
-  background: var(--c-primary-soft);
+  color: var(--c-ink);
 }
 
 .nav-link.active::after {
   content: '';
   position: absolute;
-  left: 50%;
-  bottom: 2px;
-  transform: translateX(-50%);
-  width: 16px;
-  height: 2px;
-  border-radius: 2px;
-  background: var(--c-gold);
+  left: 11px;
+  right: 11px;
+  bottom: -1px;
+  height: 1px;
+  background: var(--c-ink);
 }
 
-/* ---- 会员木牌 ---- */
+/* ---- 会员牌 ---- */
 .who {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 0 6px 0 10px;
-  padding: 3px 10px 3px 3px;
+  margin: 0 6px 0 12px;
+  padding: 2px 8px 2px 2px;
   border-radius: var(--radius-full);
-  background: rgba(255, 253, 248, 0.75);
+  background: transparent;
   border: 1px solid var(--c-line);
 }
 
 .avatar {
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-full);
   display: grid;
   place-items: center;
-  color: #fdf6e6;
+  color: #fdfcf8;
   font-family: var(--font-display);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   flex-shrink: 0;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
 }
 
 .who-name {
@@ -352,15 +335,15 @@ watch(
   white-space: nowrap;
 }
 
-/* 管理员小印：公会金 */
+/* 管理员标记：只有一行小字，不再做成金色小印 */
 .badge-admin {
-  font-size: 10px;
+  font-size: 10.5px;
   font-weight: 600;
-  padding: 1px 6px;
-  border-radius: var(--radius-full);
-  color: #7d5a14;
+  letter-spacing: 0.08em;
+  padding: 0 5px;
+  border-radius: var(--radius-sm);
+  color: var(--c-gold);
   background: var(--c-gold-soft);
-  border: 1px solid var(--c-gold-line);
 }
 
 /* ---- 主体 ---- */
@@ -370,11 +353,10 @@ watch(
 
 /* ---- 落款 ---- */
 .footer {
-  padding: 8px 20px 30px;
+  padding: 10px 20px 32px;
   text-align: center;
 }
 
-/* 页脚上方的装饰线：渐隐横线 + 中间一颗金菱形，和正文里的 .ornament 同款 */
 .footer-ornament {
   display: flex;
   justify-content: center;
@@ -388,15 +370,15 @@ watch(
   content: '';
   flex: 1;
   height: 1px;
-  background: linear-gradient(90deg, transparent, var(--c-line-strong), transparent);
+  background: var(--c-line);
 }
 
 .footer-ornament i {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
   margin: 0 10px;
   transform: rotate(45deg);
-  background: var(--c-gold-light);
+  background: var(--c-line-strong);
   flex-shrink: 0;
 }
 
@@ -411,14 +393,14 @@ watch(
   margin-top: 3px;
   font-size: 10.5px;
   letter-spacing: 0.12em;
-  color: rgba(156, 144, 122, 0.75);
+  color: var(--c-ink-4);
+  opacity: 0.8;
 }
 
-/* ---- 窄屏：门楣上那排东西一行放不下 ----
-   隐掉副题和用户名，只留徽记，保住导航不换行 */
+/* ---- 窄屏：门楣上那排东西一行放不下 ---- */
 @media (max-width: 640px) {
   .topbar-inner {
-    padding: 0 12px;
+    padding: 0 14px;
     gap: 8px;
   }
 
@@ -430,14 +412,18 @@ watch(
 
   .who {
     margin: 0 2px 0 4px;
-    padding: 3px;
-    background: transparent;
+    padding: 2px;
     border: none;
   }
 
   .nav-link {
-    padding: 8px 9px;
+    padding: 8px 8px;
     font-size: 13px;
+  }
+
+  .nav-link.active::after {
+    left: 8px;
+    right: 8px;
   }
 }
 </style>

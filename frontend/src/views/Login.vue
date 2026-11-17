@@ -135,7 +135,7 @@ async function handleSubmit() {
   text-align: center;
   color: #fdf6e6;
   /* 墨蓝渐变的皮革封面 */
-  background: linear-gradient(150deg, #35648f, #1e3a55);
+  background: var(--c-primary-dark);
 }
 
 /*
@@ -150,7 +150,7 @@ async function handleSubmit() {
   width: 210px;
   height: 210px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(217, 178, 94, 0.35), transparent 70%);
+  background: none;
   pointer-events: none;
 }
 
@@ -175,7 +175,7 @@ async function handleSubmit() {
   font-family: var(--font-display);
   font-size: 22px;
   font-weight: 700;
-  background: linear-gradient(135deg, #d9b25e, #b8892b);
+  background: var(--c-gold);
   color: #2b2110;
   box-shadow:
     inset 0 0 0 1px rgba(255, 255, 255, 0.45),

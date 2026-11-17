@@ -181,7 +181,7 @@ onMounted(load)
   border-radius: var(--radius-lg);
   font-size: 13.5px;
   color: var(--c-ink-2);
-  background: linear-gradient(135deg, rgba(249, 239, 214, 0.92), rgba(252, 248, 239, 0.88));
+  background: var(--c-warning-soft);
   border: 1px solid rgba(184, 137, 43, 0.3);
   box-shadow: var(--shadow-sm);
 }

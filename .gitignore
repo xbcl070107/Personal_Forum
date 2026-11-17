@@ -97,6 +97,10 @@ bootstrap-local.yml
 .DS_Store
 Thumbs.db
 
+# 上传的图片（W2 的 /file/upload 会落到这里，图不进版本库）
+# 目录本身由 FileService 启动时自动创建，所以换机器拉下来是空的也没关系
+uploads/
+
 # maven
 .mvn/tmp/
 .mvn/wrapper/maven-wrapper.properties

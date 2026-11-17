@@ -213,7 +213,7 @@ watch(
   align-items: center;
   gap: 7px;
   padding: 7px 14px 7px 12px;
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-sm);
   border: 1px solid var(--c-line);
   background: rgba(255, 253, 248, 0.72);
   color: var(--c-ink-3);
@@ -250,14 +250,14 @@ watch(
 .act.on {
   color: #fdf8ec;
   border-color: var(--c-gold-line);
-  background: linear-gradient(135deg, var(--c-primary-light), var(--c-primary-dark));
+  background: var(--c-primary);
   box-shadow: var(--shadow-primary);
 }
 
 .act.on:hover {
   color: #fdf8ec;
   border-color: var(--c-gold-light);
-  background: linear-gradient(135deg, #4d82a8, var(--c-primary));
+  background: var(--c-primary-dark);
 }
 
 /* 请求在飞的时候让图标轻轻呼吸，表示「收到了，在等回应」 */
