@@ -121,6 +121,19 @@ watch(
 
         <nav class="nav">
           <!--
+            集市是**游客也能进**的地方，所以它写在下面前后分支的外面，
+            不走 navItems 那套「登录后才显示」的逻辑。
+            想加其他公开栏目（比如以后的活动页），照这个位置放。
+          -->
+          <router-link
+            to="/market"
+            class="nav-link"
+            :class="{ active: activeNav === 'market' || activeNav === 'shop' }"
+          >
+            集市
+          </router-link>
+
+          <!--
             v-if / v-else 决定登录前后顶栏长什么样。
             userStore.isLogin 是 Pinia 里的 computed，登录 / 退出时它会自动变，
             这个模板跟着自动重渲染 —— 这就是用 Pinia 而不是直接读 localStorage 的原因。

@@ -205,10 +205,27 @@
             <version>3.1.1</version>
         </dependency>
 
+        <!-- 【消息队列客户端】RabbitMQ 的 Java 客户端。
+             现在代码里还没用到（W8 之后做「下单成功发通知」才用得上），先把版本放对：
+             原来写的 1.0.0 是 2007 年的包，和现在 3.x/4.x 的 RabbitMQ 服务端协议对不上，
+             真连上去会报莫名其妙的 frame 解析错误。5.38.0 是当前正式版。 -->
         <dependency>
             <groupId>com.rabbitmq.client</groupId>
             <artifactId>amqp-client</artifactId>
-            <version>1.0.0</version>
+            <version>5.38.0</version>
+        </dependency>
+
+        <!-- 【文件上传看文件头】Hutool 的 core 包。
+             只为三件事引入它：
+               1. FileTypeUtil.getType(InputStream) —— 读文件头判断真实类型，
+                  替掉手写的 & 0xFF 魔数比较（原理一样，别人写好了，还认识更多格式）；
+               2. IdUtil.simpleUUID() —— 32 位无横线随机名；
+               3. FileUtil.extName(...) / mkParentDirs(...) —— 取扩展名、递归建目录。
+             只引 hutool-core，不引 hutool-all：all 会把数据库、HTTP、加密那一整套拖进来。 -->
+        <dependency>
+            <groupId>cn.hutool</groupId>
+            <artifactId>hutool-core</artifactId>
+            <version>5.8.25</version>
         </dependency>
 
     </dependencies>
@@ -277,5 +294,7 @@
 
         </plugins>
     </build>
+
+
 
 </project>

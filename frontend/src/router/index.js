@@ -20,6 +20,10 @@ import { createRouter, createWebHashHistory } from 'vue-router'
  */
 const routes = [
   { path: '/', name: 'home', component: () => import('../views/Home.vue') },
+  // 集市（商品列表）。游客也能看，所以不加 meta.needLogin
+  { path: '/market', name: 'market', component: () => import('../views/Market.vue') },
+  // 店铺主页。:id 是数字店铺 id，后端 /shop/{id} 在白名单里，游客可看
+  { path: '/shop/:id', name: 'shop', component: () => import('../views/Shop.vue') },
   { path: '/login', name: 'login', component: () => import('../views/Login.vue') },
   { path: '/register', name: 'register', component: () => import('../views/Register.vue') },
   { path: '/post/:id', name: 'postDetail', component: () => import('../views/PostDetail.vue') },

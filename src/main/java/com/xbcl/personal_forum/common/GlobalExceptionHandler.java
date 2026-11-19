@@ -96,7 +96,17 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(org.springframework.web.multipart.MultipartException.class)
     public ResponseEntity<Result<Void>> handleMultipart(Exception e) {
         log.warn("上传请求被拒绝：{}", e.getMessage());
-        return ResponseEntity.badRequest().body(Result.error(400, "图片不能超过 5MB"));
+
+        // 同一个父类下面挂着两类完全不同的错，用户该看的提示也不一样：
+        //   ① MaxUploadSizeExceededException —— 图真的超过 5MB
+        //   ② "Current request is not a multipart request" —— 根本没按 form-data 传
+        // 实测过：拿 application/json 空 body 打 /file/upload，之前一律回
+        // "图片不能超过 5MB"，对着一个空请求说图太大，纯属误导。
+        if (e instanceof org.springframework.web.multipart.MaxUploadSizeExceededException) {
+            return ResponseEntity.badRequest().body(Result.error(400, "图片不能超过 5MB"));
+        }
+        return ResponseEntity.badRequest()
+                .body(Result.error(400, "上传要用 form-data，字段名 file，且只能是 jpg/png/webp"));
     }
 
     @ExceptionHandler(Exception.class)
