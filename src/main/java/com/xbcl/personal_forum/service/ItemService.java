@@ -84,6 +84,15 @@ public class ItemService {
      */
     private final OrdersMapper ordersMapper;
 
+    /**
+     * W7 才注入：商品详情的缓存读写 + 浏览量计数。
+     *
+     * <p>拆成一个独立 Service 而不是在这里直接 {@code @Autowired StringRedisTemplate}：
+     * 详情缓存是「一个方法里插三步」的改造，如果 Redis 命令直接写在 detail 里，
+     * 这个方法会同时负责"给谁看"和"怎么存"，两边一改就互相干扰。
+     */
+    private final ItemCacheService itemCacheService;
+
     /** 每页最多 50 条，和 PostService 同一套夹取规则 */
     private static final long MAX_PAGE_SIZE = 50;
 
@@ -326,34 +335,95 @@ public class ItemService {
     }
 
     /**
-     * 商品详情（GET /item/{id}）。
+     * 商品详情（W3 已实现，W7 加缓存）。
      *
-     * <p>入参 viewerUserId 是"当前看的人"，由 Controller 从 token 取；
-     * 目前接口要求登录，所以它不会为 null。
+     * <p><b>接口</b>：<code>GET /dev-api/item/{id}</code>，带 token。
+     * <pre>
+     * 成功  {"code":200,"message":"ok","data":{
+     *          "id":7,"shopId":3,"shopName":"xx的小店","title":"九成新键盘",
+     *          "priceCents":12000,"stock":5,"soldCount":2,"viewCount":37,
+     *          "images":["/dev-api/uploads/images/2026-11/a.jpg"],
+     *          "status":1,"createdAt":"2026-11-21T10:00:00","updatedAt":"..."}}
+     * </pre>
      *
-     * <p>返回：{@code ItemVO}（含 shopName、images 已转 List）。
+     * <p><b>W7 加了什么</b>：先查 Redis，命中就直接返回（日志里能看出 hit）；
+     * 未命中才走 {@link #loadDetailFromDb} 查库。查库确认不存在时写 60 秒空值标记；
+     * 在售商品回源后写缓存；每次成功浏览在 Redis 里 +1，由定时任务批量落库。
      *
-     * <p>验收：存在的 id 返回 200 + 完整字段；不存在的 id 返回 404 +
-     * message "商品不存在"；下架的 id（非店主看）也要 404。
+     * <p><b>失败情况</b>
+     * <ul>
+     *   <li>404 商品不存在</li>
+     *   <li>404 商品已下架，且当前用户不是店主</li>
+     * </ul>
+     *
+     * <p><b>注意</b>：下架商品<b>不进正文缓存</b>。缓存是"谁读都是同一份"，
+     * 而下架商品只有店主能看 —— 缓存一份就等于让游客也拿到了答案。
      */
     public ItemVO detail(Long itemId, Long viewerUserId) {
+        // 1. 缓存优先：一次 Redis 往返，命中就直接返回
+        ItemCacheService.CacheHit hit = itemCacheService.getDetail(itemId);
+        if (hit.hit()) {
+            // 命中空值标记：库里已经确认没有这件商品
+            if (hit.vo() == null) {
+                throw new BusinessException(404, "商品不存在");
+            }
+            // 命中正文：缓存里只会有在售商品，谁读都一样，不用判权限
+            // ps：debug 不用 info —— 详情页是热接口，info 会刷屏；
+            //     验收时把 logging.level.com.xbcl.personal_forum.service.ItemCacheService 调成 debug
+            log.debug("商品详情缓存命中：id={}", itemId);
+            itemCacheService.incrView(itemId);
+            return hit.vo();
+        }
 
-        // 步骤 1：Item item = itemMapper.selectById(itemId)
-        //   null → throw new BusinessException(404, "商品不存在")
-        //   注意：GlobalExceptionHandler 会把 code 当作 HTTP 状态码，
-        //   所以 404 就真的是 404，不是 200 里包一个 code=404
-        //
+        // 2. 未命中 → 回源查库
+        ItemVO vo = loadDetailFromDb(itemId, viewerUserId);
+        if (vo == null) {
+            // 2.1 库里根本没有：写空值标记，防止同一个不存在的 id 把库打穿
+            // ps："有但不可见"（下架且不是店主）走不到这里 —— loadDetailFromDb 自己抛 404。
+            //     那种情况绝对不能进缓存：缓存是所有人共读的，下架只对店主可见
+            itemCacheService.putNull(itemId);
+            throw new BusinessException(404, "商品不存在");
+        }
+
+        // 3. 回源成功、且是在售的，才写缓存
+        // ps：下架商品 loadDetailFromDb 也会返回（给店主看），但缓存一份就等于让游客也看到了
+        if (Objects.equals(vo.getStatus(), Item.STATUS_ON)) {
+            itemCacheService.putDetail(vo);
+        }
+
+        // 4. 记一次浏览
+        // ps：放在最后。404 的路走不到这里，浏览量才不会把不存在的 id 也算进去
+        itemCacheService.incrView(itemId);
+
+        // 5. 返回
+        return vo;
+    }
+
+    /**
+     * 商品详情的"回源"路径：查库 + 判可见性 + 拼 VO。
+     *
+     * <p>从 W3 的 {@code detail} 原样搬出来，只改了名字。
+     * 这样"缓存怎么用"全在 {@link #detail}，"一次干净的数据库查询"全在这里 ——
+     * 这个方法不碰 Redis，可以单独测。
+     *
+     * <p><b>被谁调用</b>：{@link #detail}（缓存未命中时）。不要让别的 Service 直接调。
+     *
+     * <p><b>返回 null 的含义</b>：库里<b>根本没有</b>这件商品（包括被逻辑删除的）。
+     * 调用方要负责把它变成 404、顺便写空值缓存 —— 这个方法自己不抛 404，
+     * 因为"要不要缓存这个 404"是调用方的策略，不是查询的事。
+     */
+    private ItemVO loadDetailFromDb(Long itemId, Long viewerUserId) {
+        // 1. 查商品：查不到就返回 null（不是抛 404，理由见方法头）
+        //    ps：GlobalExceptionHandler 把 code 当 HTTP 状态码 —— 真正抛出去的 404
+        //        是真的 404，不是 200 里包一个 code=404
         Item item = itemMapper.selectById(itemId);
         if (item == null) {
-            throw new BusinessException(404,"商品不存在");
+            return null;
         }
         Shop shop = shopMapper.selectById(item.getShopId());
-        // 步骤 2：下架的商品对游客不可见（当前接口要登录，所以这里用 viewerUserId 判断）
-        //   item.getStatus() != Item.STATUS_ON 时：
-        //     查这件商品所属店 shopMapper.selectById(item.getShopId())，
-        //     如果 shop.getOwnerUserId() 不等于 viewerUserId → 404 "商品不存在"
-        //   ⚠️ 用 404 而不是 403：403 等于告诉别人"这商品存在，只是下架了"
-        //
+        // 2. 下架商品只有店主能看
+        //    ps：用 404 不用 403 —— 403 等于告诉游客"这商品存在，只是下架了"
+        //    ps：shop 为 null（数据被硬删过）时按"不是店主"处理，别让 NPE 变成 500
         Integer st = item.getStatus();
         if (st == null || st != Item.STATUS_ON) {
             if (shop == null
@@ -361,18 +431,14 @@ public class ItemService {
                 throw new BusinessException(404, "商品不存在");
             }
         }
-        // 步骤 3：shopName 回填（详情只有一条，直接 selectById 就够，不涉及 N+1）
-        //   店可能已经关了（status != 正常），这种情况 shopName 给店名还是 null？
-        //   建议给店名 —— 已成交的订单以后还要展示它
-
-        //
-        // 步骤 4：return ItemVO.of(item, fromJson(item.getImagesJson()))
+        // 3. 拼 VO + 补店名
+        //    ps：详情只有一条，selectById 就够，这里不存在列表那种 N+1 问题
+        //    ps：店可能已经关了，店名照样给 —— 已成交订单以后还要展示它
         ItemVO vo = ItemVO.of(item, fromJson(item.getImagesJson()));
         if (shop != null) {
             vo.setShopName(shop.getName());
         }
-        //
-       return vo;
+        return vo;
     }
 
     /**
@@ -435,6 +501,11 @@ public class ItemService {
         //    ps：updateById 会按逻辑删除自动补 is_deleted = 0，删掉的商品改不动，正好
         item.setStatus(status);
         itemMapper.updateById(item);
+        // 6. 删详情缓存（W7）
+        //    ps：下架必须立刻生效 —— 集市列表已经查不到它了，详情页却还能打开，就是越权
+        //    ps：只删"详情"这一类，库存相关的缓存不在这里删（见 docs/W7 的一致性策略：
+        //        库存展示允许滞后 TTL，下单以 deductStock 的条件更新为准）
+        itemCacheService.evict(itemId);
         // 6. 返回改完的 VO
         //    ps：shopName 用第 2 步查到的 shop，别再查一次库
         ItemVO vo = ItemVO.of(item, fromJson(item.getImagesJson()));

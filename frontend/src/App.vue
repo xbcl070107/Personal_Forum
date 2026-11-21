@@ -28,18 +28,57 @@ const userStore = useUserStore()
  */
 const activeNav = computed(() => route.name)
 
+/**
+ * 集市那一片的页面：集市列表、店铺主页、商品详情。
+ *
+ * 这几个页面里顶栏第一个链接要变成「帖子」，点一下回论坛；
+ * 反过来在帖子这边就显示「集市」。等于把两个大栏目做成一对切换键，
+ * 而不是并排放两个入口 —— 顶栏位置本来就紧，登录后还要塞五个链接。
+ */
+const MARKET_ROUTES = ['market', 'shop', 'itemDetail']
+const onMarketSide = computed(() => MARKET_ROUTES.includes(activeNav.value))
+
+/**
+ * 顶栏第一个链接的「另一头」。
+ *
+ * 故意不加 active 高亮：它指向的是**另一个**栏目，
+ * 高亮了反而让人以为当前就在那边。当前栏目的方向感交给页面标题
+ * （「今日委托」/「冒险者集市」）和下面的栏目导航。
+ */
+const crossNav = computed(() =>
+  onMarketSide.value
+    ? { label: '帖子', to: '/', hint: '回帖子列表' }
+    : { label: '集市', to: '/market', hint: '去集市看看' },
+)
+
 /** 顶栏那组导航项。条件写在数据里，省得模板里嵌三层判断 */
 const navItems = computed(() => {
   const items = []
   if (userStore.isLogin) {
     items.push({ name: 'postEdit', label: '发布委托', to: '/publish' })
     items.push({ name: 'userCenter', label: '我的委托', to: '/my' })
+    // 订单相关的三个页面共用一个「我的订单」入口：结算、详情都算在这一栏里
+    items.push({
+      name: 'orders',
+      label: '我的订单',
+      to: '/orders',
+      activeOn: ['orders', 'orderDetail', 'checkout'],
+    })
+    items.push({ name: 'merchant', label: '我的店铺', to: '/merchant' })
     if (userStore.isAdmin) {
       items.push({ name: 'audit', label: '审核台', to: '/audit' })
     }
   }
   return items
 })
+
+/**
+ * 某个导航项现在是否该高亮。
+ * 默认看路由 name 是否相等；带 activeOn 的栏目（订单）把详情、结算也算进去。
+ */
+function isNavActive(item) {
+  return activeNav.value === item.name || (item.activeOn || []).includes(activeNav.value)
+}
 
 /**
  * 徽记里那个字：取**昵称**的首字，不是用户名的。
@@ -121,16 +160,11 @@ watch(
 
         <nav class="nav">
           <!--
-            集市是**游客也能进**的地方，所以它写在下面前后分支的外面，
-            不走 navItems 那套「登录后才显示」的逻辑。
-            想加其他公开栏目（比如以后的活动页），照这个位置放。
+            帖子 / 集市 是一对切换键：在帖子这边显示「集市」，在集市那边显示「帖子」。
+            两边都是游客能进的公开栏目，所以它不走 navItems 那套「登录后才显示」的逻辑。
           -->
-          <router-link
-            to="/market"
-            class="nav-link"
-            :class="{ active: activeNav === 'market' || activeNav === 'shop' }"
-          >
-            集市
+          <router-link :to="crossNav.to" class="nav-link" :title="crossNav.hint">
+            {{ crossNav.label }}
           </router-link>
 
           <!--
@@ -144,7 +178,7 @@ watch(
               :key="item.name"
               :to="item.to"
               class="nav-link"
-              :class="{ active: activeNav === item.name }"
+              :class="{ active: isNavActive(item) }"
             >
               {{ item.label }}
             </router-link>
@@ -411,7 +445,7 @@ watch(
 }
 
 /* ---- 窄屏：门楣上那排东西一行放不下 ---- */
-@media (max-width: 640px) {
+@media (max-width: 760px) {
   .topbar-inner {
     padding: 0 14px;
     gap: 8px;

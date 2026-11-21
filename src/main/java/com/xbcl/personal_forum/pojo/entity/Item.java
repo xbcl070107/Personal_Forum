@@ -49,6 +49,19 @@ public class Item {
     /** 已售数量，只统计支付成功的 */
     private Integer soldCount;
 
+    /**
+     * 浏览量（W7）。
+     *
+     * <p><b>不是实时值</b>：每次打开详情页先在 Redis 里 {@code HINCRBY} 累加，
+     * 由 {@code task/ItemViewFlushTask} 每 30 秒批量累加进这一列。
+     * 所以库里的数最多比真实浏览少一个落库周期（30 秒），服务崩溃时还会丢一点 ——
+     * 浏览量是统计值，不值得为它加锁、加事务、加消息队列。
+     *
+     * <p>库存（{@link #stock}）是权威值，不许用这套"先攒再生效"的办法；
+     * 两个字段长得像，但一个能让业务算错钱，一个只影响页面上的一个数字。
+     */
+    private Integer viewCount;
+
     /** 图片 URL 的 JSON 数组字符串，例如 ["/dev-api/uploads/images/2026-11/a.jpg"] */
     private String imagesJson;
 

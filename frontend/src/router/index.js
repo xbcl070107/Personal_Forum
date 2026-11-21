@@ -24,6 +24,45 @@ const routes = [
   { path: '/market', name: 'market', component: () => import('../views/Market.vue') },
   // 店铺主页。:id 是数字店铺 id，后端 /shop/{id} 在白名单里，游客可看
   { path: '/shop/:id', name: 'shop', component: () => import('../views/Shop.vue') },
+  // 商品详情。后端 /item/{id} 要求登录，而且下架商品只有店主本人能看
+  {
+    path: '/item/:id',
+    name: 'itemDetail',
+    component: () => import('../views/ItemDetail.vue'),
+    meta: { needLogin: true },
+  },
+  // 结算页。购物车在下单前不存在，这里只带一个 itemId + 数量
+  {
+    path: '/checkout/:id',
+    name: 'checkout',
+    component: () => import('../views/Checkout.vue'),
+    meta: { needLogin: true },
+  },
+  {
+    path: '/orders',
+    name: 'orders',
+    component: () => import('../views/Orders.vue'),
+    meta: { needLogin: true },
+  },
+  {
+    path: '/order/:id',
+    name: 'orderDetail',
+    component: () => import('../views/OrderDetail.vue'),
+    meta: { needLogin: true },
+  },
+  {
+    path: '/addresses',
+    name: 'addresses',
+    component: () => import('../views/Addresses.vue'),
+    meta: { needLogin: true },
+  },
+  // 我的店铺（开店 / 改资料 / 发布 / 上下架）
+  {
+    path: '/merchant',
+    name: 'merchant',
+    component: () => import('../views/Merchant.vue'),
+    meta: { needLogin: true },
+  },
   { path: '/login', name: 'login', component: () => import('../views/Login.vue') },
   { path: '/register', name: 'register', component: () => import('../views/Register.vue') },
   { path: '/post/:id', name: 'postDetail', component: () => import('../views/PostDetail.vue') },

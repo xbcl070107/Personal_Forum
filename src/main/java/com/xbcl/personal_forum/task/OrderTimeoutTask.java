@@ -26,9 +26,10 @@ import java.util.List;
  *       fixedRate = 每 N 毫秒<b>必须开始</b>一轮。这一轮扫 200 单花了 3 秒，
  *       fixedRate 会把下一轮标记成「已经迟到了」，连着补跑，越积越多；
  *       fixedDelay 永远不会堆积。定时任务绝大多数时候都该用 fixedDelay。</li>
- *   <li><b>为什么骨架期是关着的。</b>OrderService.closeTimeoutOrder 现在还是抛 501 的骨架，
- *       开着的话每分钟都会在控制台刷一条错误日志，淹掉你自己在调的接口。
- *       实现完把 application.yaml 里的 forum.order.timeout-scan-enabled 改成 true。</li>
+ *   <li><b>为什么默认是关着的。</b>这是一个会<b>改数据</b>的后台任务：一打开就会把库里所有
+ *       过了 expire_at 的待付款单关掉、回补库存。开发时自己还没造好测试数据，就别让它先动手；
+ *       调试接口时也不想每分钟多一条 SQL 的干扰。要验证时把 application.yaml 里的
+ *       forum.order.timeout-scan-enabled 改成 true（或启动参数 --forum.order.timeout-scan-enabled=true）。</li>
  * </ol>
  *
  * <p>三个配置项（application.yaml 的 forum.order 下，都有默认值，不配也能启动）：

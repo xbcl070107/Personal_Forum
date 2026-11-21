@@ -18,26 +18,26 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * 订单接口（W5 下单/支付已实现，W6 生命周期是骨架）。
+ * 订单接口（W5 下单/支付 + W6 发货/收货/取消/列表/超时关单，全部已实现）。
  *
  * <p>完整路径：
  * <pre>
  *   POST /dev-api/order              下单                需 token          （已实现）
  *   GET  /dev-api/order/{id}         订单详情            需 token（买家或卖家）（已实现）
  *   POST /dev-api/order/{id}/pay     模拟支付            需 token（只能付自己的单）（已实现）
- *   POST /dev-api/order/{id}/ship    发货                需 token（该店店主）   ← W6 骨架
- *   POST /dev-api/order/{id}/confirm 确认收货            需 token（买家本人）   ← W6 骨架
- *   POST /dev-api/order/{id}/cancel  取消订单（未付款）   需 token（买家本人）   ← W6 骨架
- *   GET  /dev-api/order/list         订单列表            需 token              ← W6 骨架
+ *   POST /dev-api/order/{id}/ship    发货                需 token（该店店主）   （已实现）
+ *   POST /dev-api/order/{id}/confirm 确认收货            需 token（买家本人）   （已实现）
+ *   POST /dev-api/order/{id}/cancel  取消订单（未付款）   需 token（买家本人）   （已实现）
+ *   GET  /dev-api/order/list         订单列表            需 token              （已实现）
  * </pre>
  *
  * <p>这一层只做三件事：取 userId、转给 Service、包 {@link Result}。
  * 每个接口的契约（入参、返回形状、会改哪些表、失败码）写在各方法的 javadoc 里；
- * 怎么实现写在 {@link OrderService} 的方法体里（编号 todo + ps）。
+ * 怎么实现写在 {@link OrderService} 的方法体里（编号步骤 + ps）。
  *
- * <p>W6 那四个接口的返回值已经定好了，但 Service 里还是 501 —— 现在调它们会得到
- * {@code {"code":501,"message":"W6 未实现：…"}}。按 OrderService 里每个方法的
- * javadoc 契约 + 方法体编号 todo 填完就通，这一层基本不用再动。
+ * <p>超时关单没有 HTTP 入口：它是 {@code OrderTimeoutTask} 每分钟扫一次、
+ * 逐单调 {@code OrderService.closeTimeoutOrder}。要验证就把
+ * {@code forum.order.timeout-scan-enabled} 打开（默认 false，见该类注释）。
  *
  * <p>为什么 /order/list 不会被 /order/{id} 抢走：Spring 匹配路由时字面量段优先于
  * 路径变量，{@code list} 比 {@code {id}} 更"具体"。所以这两个不冲突，
@@ -151,9 +151,8 @@ public class OrderController {
     }
 
     // =====================================================================
-    // 以下是 W6 的骨架（订单生命周期）：发货 / 确认收货 / 取消 / 订单列表。
-    // 路径、入参、返回类型都定好了，业务在 OrderService 里（现在是 501），
-    // 那边按 javadoc 契约填方法体，这一层基本不用再动。
+    // 以下是 W6 的订单生命周期：发货 / 确认收货 / 取消 / 订单列表。
+    // 这一层只是转调 OrderService，状态流转、CAS、库存回补全在那边。
     // =====================================================================
 
     /**

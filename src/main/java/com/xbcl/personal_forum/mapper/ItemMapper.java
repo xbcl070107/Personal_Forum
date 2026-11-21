@@ -89,4 +89,32 @@ public interface ItemMapper extends BaseMapper<Item> {
              WHERE id = #{itemId}
             """)
     int restoreStock(@Param("itemId") Long itemId, @Param("qty") int qty);
+
+    /**
+     * 浏览量累加（W7）：把 Redis 里攒的一批增量一次性加进 item.view_count。
+     *
+     * <p>由 {@code task/ItemViewFlushTask} 每 30 秒调一次，一个商品调一次，
+     * 不是每次浏览都调 —— 后者会把详情页的 QPS 直接打到数据库上，
+     * 那就白做缓存了。</p>
+     *
+     * <p><b>为什么用 {@code view_count = view_count + #{delta}} 而不是先查再 set：</b>
+     * 和扣库存的理由一样，但这里更宽松 —— 浏览量算错一点没人发现，
+     * 所以并发下"后写的覆盖先写的"其实也能忍；写成自增只是为了少一次查询，
+     * 顺带在落库任务重叠时也不会把数字改小。</p>
+     *
+     * <p><b>为什么带 is_deleted = 0：</b>手写 SQL 不走 MyBatis-Plus 的逻辑删除，
+     * 不写的话会把浏览量加进已删除的行。加不到也没关系（0 行），调用方记 debug 即可，
+     * <b>不要抛异常</b> —— 一个浏览量让整个落库批次失败不值得。</p>
+     *
+     * @param itemId 商品 id
+     * @param delta  要加多少（来自 Redis 的增量，正常情况下 ≥ 1）
+     * @return 受影响行数：1 加成功；0 说明商品不在了（已删 / 被硬删）
+     */
+    @Update("""
+            UPDATE item
+               SET view_count = view_count + #{delta}
+             WHERE id = #{itemId}
+               AND is_deleted = 0
+            """)
+    int incrViewCount(@Param("itemId") Long itemId, @Param("delta") long delta);
 }

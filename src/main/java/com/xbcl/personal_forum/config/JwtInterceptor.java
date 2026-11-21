@@ -77,6 +77,19 @@ public class JwtInterceptor implements HandlerInterceptor {
                              HttpServletResponse response,
                              Object handler) throws Exception {
 
+        // ⓪ 店铺主页是公开页：GET /shop/{数字 id} 允许游客看，不用带 token。
+        //
+        //    为什么不放回 WebMvcConfig 的 excludePathPatterns：那里只能按路径通配，
+        //    "/shop/*" 会把 /shop/mine 也放掉 —— mine 必须知道「你是谁」，
+        //    拦截器不跑就只能 401。所以在这里用「方法 + 正则」精确放行一条。
+        //
+        //    getServletPath() 拿到的已经是去掉 context-path（/dev-api）之后的部分，
+        //    正好就是拦截器匹配时用的 /shop/4 这种形状。
+        if ("GET".equals(request.getMethod())
+                && request.getServletPath().matches("/shop/\\d+")) {
+            return true;
+        }
+
         // ① 取 token。空串和 "abc" 都会被 startsWith 挡掉，所以两个条件就够了
         String header = request.getHeader("Authorization");
         if (header == null || !header.startsWith("Bearer ")) {

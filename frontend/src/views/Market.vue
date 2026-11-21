@@ -112,10 +112,16 @@ function handlePage(num) {
   loadItems()
 }
 
-/** 点卖家那一行进店。用 stop 是因为卡片本身以后可能会整块可点 */
+/** 点卖家那一行进店。卡片本身也可点，所以这里必须 stop，不然会一起跳商品详情 */
 function goShop(shopId) {
   if (!shopId) return
   router.push(`/shop/${shopId}`)
+}
+
+/** 整张卡片进商品详情 */
+function goItem(itemId) {
+  if (!itemId) return
+  router.push(`/item/${itemId}`)
 }
 
 onMounted(() => {
@@ -170,7 +176,15 @@ onMounted(() => {
     <section v-if="loading" class="loading">正在翻账本…</section>
 
     <section v-else-if="items.length" class="grid">
-      <article v-for="item in items" :key="item.id" class="card">
+      <article
+        v-for="item in items"
+        :key="item.id"
+        class="card"
+        role="link"
+        tabindex="0"
+        @click="goItem(item.id)"
+        @keydown.enter="goItem(item.id)"
+      >
         <div class="thumb">
           <img v-if="item.images && item.images.length" :src="item.images[0]" :alt="item.title" />
           <span v-else class="thumb-mark">{{ glyphOf(item) }}</span>
@@ -188,8 +202,8 @@ onMounted(() => {
             <span class="sold">已售 {{ item.soldCount }}</span>
           </div>
 
-          <!-- 卖家那一行：点它进店。这就是 W4 说的「点卖家头像能进店」 -->
-          <button class="seller" type="button" @click="goShop(item.shopId)">
+          <!-- 卖家那一行：点它进店。stop 掉冒泡，否则会连商品一起跳 -->
+          <button class="seller" type="button" @click.stop="goShop(item.shopId)">
             <span class="seller-mark">{{ item.shopName ? item.shopName.charAt(0) : '店' }}</span>
             <span class="seller-name">{{ item.shopName || '无名小店' }}</span>
             <span class="seller-go">进店 ›</span>
@@ -322,22 +336,34 @@ onMounted(() => {
   border: 1px solid var(--c-line);
   border-radius: var(--radius-lg);
   overflow: hidden;
-  transition: border-color 0.18s var(--ease);
+  cursor: pointer;
+  transition: border-color 0.18s var(--ease), transform 0.18s var(--ease);
 }
 
 .card:hover {
   border-color: var(--c-line-strong);
+  transform: translateY(-1px);
+}
+
+.card:focus-visible {
+  outline: 2px solid var(--c-primary-line);
+  outline-offset: 2px;
 }
 
 .thumb {
+  position: relative;
   display: grid;
   place-items: center;
   aspect-ratio: 4 / 3;
+  overflow: hidden;
   background: var(--c-parchment-2);
   border-bottom: 1px solid var(--c-line-soft);
 }
 
 .thumb img {
+  position: absolute;
+  inset: 0;
+  display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;

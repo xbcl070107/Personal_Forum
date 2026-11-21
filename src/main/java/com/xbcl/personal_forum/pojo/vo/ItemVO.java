@@ -44,6 +44,13 @@ public class ItemVO {
     /** 已售，只统计支付成功的 */
     private Integer soldCount;
 
+    /**
+     * 浏览量（W7）。由 item 表定时落库，<b>允许滞后</b>：
+     * 详情页从缓存里拿到的可能是几十秒前的数，刷新一次不一定会立刻 +1。
+     * 想看到"当下就动"的话得每次查库，那缓存就白做了。
+     */
+    private Integer viewCount;
+
     /** 图片 URL 列表，可能为空列表（没传图）但不会是 null */
     private List<String> images;
 
@@ -71,6 +78,7 @@ public class ItemVO {
         vo.setPriceCents(item.getPriceCents());
         vo.setStock(item.getStock());
         vo.setSoldCount(item.getSoldCount());
+        vo.setViewCount(item.getViewCount() == null ? 0 : item.getViewCount());
         vo.setImages(images == null ? List.of() : images);
         vo.setStatus(item.getStatus());
         vo.setCreatedAt(item.getCreatedAt());

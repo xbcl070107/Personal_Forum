@@ -84,11 +84,10 @@ public class WebMvcConfig implements WebMvcConfigurer {
                         "/post/list",        // 帖子列表，游客可见
                         "/item/category/list", // 商品分类 tab，游客可见
                         "/item/list",        // 集市列表，游客可见（W3；接口已挂上，逻辑在 ItemService.listMarket 待实现）
-                        // W4：店铺主页是公开页 —— 游客在集市点卖家头像也该能进店。
-                        // 注意 /shop/* 会把 /shop/mine 一起放出去（* 只匹配一层，但 mine 正好是一层），
-                        // 所以 ShopService.mine() 里补了一句 userId == null → 401 自己兜住。
-                        // 为什么不写成 /shop/{id}：拦截器用的是路径匹配，不是 Spring MVC 的变量语法。
-                        "/shop/*",
+                        // 店铺主页 GET /shop/{id} 游客可见，但 /shop/mine、POST /shop 必须登录。
+                        // 之前这里写的是 "/shop/*"，把 /shop/mine 也一起放了出去 ——
+                        // 拦截器不跑，Controller 取不到 userId，ShopService.mine() 只能 401。
+                        // 现在改成在 JwtInterceptor 里只放行「GET + 纯数字 id」的那一条。
                         "/uploads/**",       // 上传的图片，由下面 addResourceHandlers 直接吐文件
 
                         // ---- Swagger / OpenAPI 文档（配置见 config/OpenApiConfig）----

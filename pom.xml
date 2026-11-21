@@ -228,6 +228,21 @@
             <version>5.8.25</version>
         </dependency>
 
+        <!-- 【缓存】Redis 客户端 + Spring 的 RedisTemplate 封装（W7）。
+             只引这一个 starter 就够了：
+               ① 带 Lettuce 连接池（Boot 4 默认客户端，不是 Jedis，别再照着 Jedis 的老教程抄）；
+               ② 自动配置 StringRedisTemplate —— 本项目 W7 只用它，
+                  因为缓存里存的是「自己序列化好的 JSON 字符串」，
+                  不需要 RedisTemplate 那套 JDK/JSON 序列化器（那套最容易踩类型擦除的坑）。
+             配置项在 application-local.yaml 的 spring.data.redis 下。
+             ⚠️ Boot 4 的前缀是 spring.data.redis，不是老教程里的 spring.redis ——
+                写成 spring.redis 会被静默忽略，然后永远连默认的 localhost:6379。
+             版本由父 POM 管（Boot 4.1.1）。 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
+
     </dependencies>
 
     <!--

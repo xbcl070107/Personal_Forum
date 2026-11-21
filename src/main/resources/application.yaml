@@ -45,6 +45,39 @@ forum:
     #    开着的话每分钟都会刷一条错误日志。等那个方法实现完、验收通过，再改成 true。
     timeout-scan-enabled: false
 
+  # ---- W7：商品详情缓存（service/ItemCacheService）----
+  # 这三个值代码里都有默认值，写出来是为了「能一眼看见、能直接改」。
+  # ⚠️ 缓存能不能用取决于 Redis 有没有起来，配置见 application-local.yaml 的 spring.data.redis。
+  #    Redis 连不上时这套缓存会自动降级成"每次都查库"，论坛照常能用，只是慢。
+  item:
+    cache:
+      # 详情缓存活多久（秒）。120 秒是个折中：
+      #   太短 = 命中率上不去，等于白做；太长 = 改了商品标题要等两分钟才生效（改价改库存不算，
+      #   那些走 deductStock 和 evict，见 docs/W7 的一致性策略）
+      detail-ttl-seconds: 120
+
+      # 随机抖动的上限（秒）。实际过期时间 = 120 + random(0, 30)。
+      # 不加抖动的话，一批商品会同时写进缓存、同时过期，然后同一秒全部回源打库（缓存雪崩）。
+      detail-ttl-jitter-seconds: 30
+
+      # 「这件商品根本不存在」的标记活多久（秒）。故意比正文短：
+      #   它是为了防止刷不存在的 id 打穿数据库，不是为了防止正常的商品被缓存。
+      #   60 秒之后自然失效，万一是真的刚发出来的商品，最多误报一分钟。
+      null-ttl-seconds: 60
+
+    # ---- W7：浏览量（task/ItemViewFlushTask）----
+    view:
+      # 两轮之间隔多久（fixedDelay：上一轮跑完再等这么久）
+      flush-interval-ms: 30000
+
+      # 启动后第一次跑之前等多久。别设 0：应用刚起来时什么都还没攒，跑一轮纯属空转。
+      flush-initial-delay-ms: 60000
+
+      # 开着的前提：Redis 起着 + item 表有 view_count 列（migration-v4b-item-view.sql）。
+      #    两个条件都满足才是 true；本机没起 Redis 时改回 false，
+      #    否则每 30 秒一条连接失败日志。
+      flush-enabled: true
+
 mybatis-plus:
   configuration:
     # 库里的 sort_order / created_at 自动映射到 Java 的 sortOrder / createdAt。

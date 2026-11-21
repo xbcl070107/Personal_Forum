@@ -110,6 +110,67 @@ export function authorOf(userId, nickname, username) {
 }
 
 /**
+ * 订单状态常量。
+ *
+ * 后端 Orders 实体里是 0~4 五个状态，前端也收成一份常量表，
+ * 页面里不要再写 `order.status === 1` 这种字面量 ——
+ * 哪天状态机加一个「退款中」，有名字的常量能一眼搜出来，数字搜不出来。
+ */
+export const ORDER_STATUS = {
+  UNPAID: 0,
+  PAID: 1,
+  SHIPPED: 2,
+  FINISHED: 3,
+  CANCELED: 4,
+}
+
+/**
+ * 订单状态的文字和标签颜色。
+ *
+ * 文案跟后端 OrderVO.statusText 保持一致：
+ * 用「下一步等谁」的口吻（1 = 待发货，不是已付款）。
+ * 前端仍然自己留一份，是因为列表页要按状态筛 tab、要配色，
+ * 只靠后端返回的字符串没法反推该用哪个 tab / 哪种颜色。
+ */
+export const ORDER_STATUS_MAP = {
+  [ORDER_STATUS.UNPAID]: { text: '待付款', tone: 'warning' },
+  [ORDER_STATUS.PAID]: { text: '待发货', tone: 'primary' },
+  [ORDER_STATUS.SHIPPED]: { text: '待收货', tone: 'primary' },
+  [ORDER_STATUS.FINISHED]: { text: '已完成', tone: 'success' },
+  [ORDER_STATUS.CANCELED]: { text: '已取消', tone: 'info' },
+}
+
+export function orderStatusOf(status) {
+  return ORDER_STATUS_MAP[status] || { text: '未知', tone: 'info' }
+}
+
+/**
+ * 分 → 元。只用于显示，**不要**拿返回值再参与计算。
+ *
+ * 后端金额全程是整数分，前端只在最后渲染这一步除以 100；
+ * 用浮点做加法（0.1 + 0.2）会算出 0.30000000000000004，对账时差一分钱。
+ * 所有加减乘除都应该发生在后端，或者用整数分算完再显示。
+ */
+export function moneyText(cents) {
+  if (cents == null || Number.isNaN(Number(cents))) return '—'
+  return (Number(cents) / 100).toFixed(2)
+}
+
+/**
+ * 元 → 分。给「发布商品」那种让用户按元输入的输入框用。
+ *
+ * 输入是 19.99 时，19.99 * 100 在浮点里是 1998.9999999999998，
+ * 所以必须 Math.round，不能直接取整（Math.floor 会少一分）。
+ * 返回 null 表示不是合法数字，调用方负责提示。
+ */
+export function yuanToCents(value) {
+  if (value === '' || value == null) return null
+  const n = Number(value)
+  if (!Number.isFinite(n) || n < 0) return null
+  return Math.round(n * 100)
+}
+
+/**
  * 只有 userId、没有用户名时的兜底名字表。
  * 不是真实用户名，纯粹为了让页面别显示成一串数字。
  */

@@ -2,9 +2,10 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import EmptyState from '../components/EmptyState.vue'
-import { getShop } from '../api/shop'
+import { getShop, myShop } from '../api/shop'
 import { listItems } from '../api/item'
 import { formatTime } from '../utils/format'
+import { useUserStore } from '../store/user'
 
 /**
  * 店铺主页（W4）。
@@ -20,10 +21,13 @@ import { formatTime } from '../utils/format'
  */
 const route = useRoute()
 const router = useRouter()
+const userStore = useUserStore()
 
 const shop = ref(null)
 const shopLoading = ref(true)
 const shopError = ref('')
+/** 当前登录用户自己的店 id；没登录/没开店就是 null */
+const myShopId = ref(null)
 
 const items = ref([])
 const total = ref(0)
@@ -40,6 +44,26 @@ const ownerInitial = computed(() => {
 })
 
 const typeText = computed(() => (shop.value?.type === 2 ? '公会店' : '个人店'))
+
+/**
+ * 这个店铺是不是我自己开的。
+ *
+ * 只有登录后才去问 /shop/mine：这个接口要 token，
+ * 游客在公开的店铺页里调它会被 401 拦截器直接踢去登录页 —— 看店不该被踢。
+ */
+const isOwner = computed(() => Boolean(myShopId.value && shop.value?.id === myShopId.value))
+
+async function loadMyShop() {
+  if (!userStore.isLogin) return
+  const res = await myShop()
+  if (res.code === 200) myShopId.value = res.data?.id ?? null
+}
+
+/** 点商品卡进详情。详情要登录，游客会被路由守卫带去登录页，登录完再回来 */
+function goItem(itemId) {
+  if (!itemId) return
+  router.push(`/item/${itemId}`)
+}
 
 function priceText(cents) {
   if (cents == null) return '—'
@@ -106,6 +130,7 @@ watch(shopId, () => {
 onMounted(() => {
   loadShop()
   loadItems()
+  loadMyShop()
 })
 </script>
 
@@ -136,16 +161,26 @@ onMounted(() => {
           <p v-else class="shop-desc shop-desc--empty">这家店还没写简介</p>
         </div>
 
-        <dl class="shop-stats">
-          <div>
-            <dt>在售</dt>
-            <dd>{{ shop.itemCount ?? 0 }}</dd>
-          </div>
-          <div>
-            <dt>关注</dt>
-            <dd>{{ shop.followerCount ?? 0 }}</dd>
-          </div>
-        </dl>
+        <div class="shop-side">
+          <dl class="shop-stats">
+            <div>
+              <dt>在售</dt>
+              <dd>{{ shop.itemCount ?? 0 }}</dd>
+            </div>
+            <div>
+              <dt>关注</dt>
+              <dd>{{ shop.followerCount ?? 0 }}</dd>
+            </div>
+          </dl>
+          <el-button
+            v-if="isOwner"
+            size="small"
+            class="manage-btn"
+            @click="router.push('/merchant')"
+          >
+            管理店铺
+          </el-button>
+        </div>
       </header>
 
       <section class="shop-body">
@@ -154,7 +189,15 @@ onMounted(() => {
         <div v-if="itemsLoading" class="loading">正在搬货…</div>
 
         <div v-else-if="items.length" class="grid">
-          <article v-for="item in items" :key="item.id" class="card">
+          <article
+            v-for="item in items"
+            :key="item.id"
+            class="card"
+            role="link"
+            tabindex="0"
+            @click="goItem(item.id)"
+            @keydown.enter="goItem(item.id)"
+          >
             <div class="thumb">
               <img
                 v-if="item.images && item.images.length"
@@ -286,12 +329,23 @@ onMounted(() => {
   color: var(--c-ink-4);
 }
 
+.shop-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
+}
+
 .shop-stats {
   display: flex;
   gap: 22px;
   margin: 0;
   padding-left: 20px;
   border-left: 1px solid var(--c-line);
+}
+
+.manage-btn {
+  margin-right: 2px;
 }
 
 .shop-stats dt {
@@ -333,22 +387,34 @@ onMounted(() => {
   border: 1px solid var(--c-line);
   border-radius: var(--radius-lg);
   overflow: hidden;
-  transition: border-color 0.18s var(--ease);
+  cursor: pointer;
+  transition: border-color 0.18s var(--ease), transform 0.18s var(--ease);
 }
 
 .card:hover {
   border-color: var(--c-line-strong);
+  transform: translateY(-1px);
+}
+
+.card:focus-visible {
+  outline: 2px solid var(--c-primary-line);
+  outline-offset: 2px;
 }
 
 .thumb {
+  position: relative;
   display: grid;
   place-items: center;
   aspect-ratio: 4 / 3;
+  overflow: hidden;
   background: var(--c-parchment-2);
   border-bottom: 1px solid var(--c-line-soft);
 }
 
 .thumb img {
+  position: absolute;
+  inset: 0;
+  display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
