@@ -27,7 +27,7 @@ import java.util.stream.Collectors;
 
 /**
  * 商品业务。W2 已完成：发布、我发布的。W3 骨架：集市列表、详情、上下架
- * （签名与契约都定好了，方法体里是 TODO，等你填）。
+ * （签名与契约都定好了，方法体按下方编号步骤填）。
  *
  * <p>两件事值得记住：
  * <ul>
@@ -199,7 +199,7 @@ public class ItemService {
 
     // =====================================================================
     // 以下是 W3 的骨架。方法签名、返回类型、错误码都定好了，
-    // 方法体里只留 TODO 步骤 —— 按序号填，每一步都能单独跑出来看结果。
+    // 方法体按编号步骤注释 —— 每一步都能单独跑出来看结果。
     //
     // 通用套路（列表/详情都要用）：
     //   查实体 → 转 VO → 回填 shopName。
@@ -229,19 +229,19 @@ public class ItemService {
                                      Long minPriceCents, Long maxPriceCents,
                                      String sort) {
 
-        // TODO 1：条件拼装（用 LambdaQueryWrapper，别手写 SQL 字符串）
+        // 步骤 1：条件拼装（用 LambdaQueryWrapper，别手写 SQL 字符串）
         //   起手式：wrapper.eq(Item::getStatus, Item.STATUS_ON)
         //   —— "集市只卖上架的" 是这个方法存在的理由，第一行就写上
         LambdaQueryWrapper<Item> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Item::getStatus, Item.STATUS_ON);
         //
-        // TODO 2：keyword —— wrapper.like(...)，注意先 trim、空串跳过
+        // 步骤 2：keyword —— wrapper.like(...)，注意先 trim、空串跳过
         //   提示：org.springframework.util.StringUtils.hasText(x)
         //
         if (StringUtils.hasText(keyword)) {
             wrapper.like(Item::getTitle, keyword.trim());
         }
-        // TODO 3：categoryId / minPriceCents / maxPriceCents —— eq / ge / le
+        // 步骤 3：categoryId / minPriceCents / maxPriceCents —— eq / ge / le
         //   每个条件都要带"参数为 null 就不加这个条件"的判断，
         //   LambdaQueryWrapper 的 xxx(boolean condition, ...) 重载就是干这个的
         //
@@ -252,7 +252,7 @@ public class ItemService {
                 .eq(shopId != null, Item::getShopId, shopId)
                 .ge(minPriceCents != null, Item::getPriceCents, minPriceCents)
                 .le(maxPriceCents != null, Item::getPriceCents, maxPriceCents);
-        // TODO 4：排序 —— switch(sort)，把前端字符串映射成 wrapper.orderByXxx
+        // 步骤 4：排序 —— switch(sort)，把前端字符串映射成 wrapper.orderByXxx
         //   new       → orderByDesc(Item::getId)
         //   priceAsc  → orderByAsc(Item::getPriceCents).orderByDesc(Item::getId)
         //   priceDesc → orderByDesc(Item::getPriceCents).orderByDesc(Item::getId)
@@ -277,11 +277,11 @@ public class ItemService {
                 break;
         }
         //
-        // TODO 5：分页查询 —— itemMapper.selectPage(page(pageNum, pageSize), wrapper)
+        // 步骤 5：分页查询 —— itemMapper.selectPage(page(pageNum, pageSize), wrapper)
         //   page(...) 这个私有方法已经帮你夹取了 1 <= pageNum、pageSize <= 50
         //
         Page<Item> result = itemMapper.selectPage(page(pageNum, pageSize), wrapper);
-        // TODO 6：回填 shopName（这一步最容易写出 N+1）
+        // 步骤 6：回填 shopName（这一步最容易写出 N+1）
         //   错误写法：PageVO.of(result, item -> { /* 每条 selectById 一次店 */ })
         //   正确写法：先收集 distinct shopId → shopMapper.selectBatchIds(ids)
         //             → 转 Map<Long, String> → 再在 lambda 里 map.get(item.getShopId())
@@ -304,7 +304,7 @@ public class ItemService {
                             (a, b) -> a          // 防御性 merge，避免重复 key 抛异常
                     ));
         }
-        // TODO 7：return PageVO.of(result, item -> {...})
+        // 步骤 7：return PageVO.of(result, item -> {...})
         //   里面：ItemVO.of(item, fromJson(item.getImagesJson())) + setShopName
         //
         return PageVO.of(result, item -> {
@@ -328,7 +328,7 @@ public class ItemService {
      */
     public ItemVO detail(Long itemId, Long viewerUserId) {
 
-        // TODO 1：Item item = itemMapper.selectById(itemId)
+        // 步骤 1：Item item = itemMapper.selectById(itemId)
         //   null → throw new BusinessException(404, "商品不存在")
         //   注意：GlobalExceptionHandler 会把 code 当作 HTTP 状态码，
         //   所以 404 就真的是 404，不是 200 里包一个 code=404
@@ -338,7 +338,7 @@ public class ItemService {
             throw new BusinessException(404,"商品不存在");
         }
         Shop shop = shopMapper.selectById(item.getShopId());
-        // TODO 2：下架的商品对游客不可见（当前接口要登录，所以这里用 viewerUserId 判断）
+        // 步骤 2：下架的商品对游客不可见（当前接口要登录，所以这里用 viewerUserId 判断）
         //   item.getStatus() != Item.STATUS_ON 时：
         //     查这件商品所属店 shopMapper.selectById(item.getShopId())，
         //     如果 shop.getOwnerUserId() 不等于 viewerUserId → 404 "商品不存在"
@@ -351,12 +351,12 @@ public class ItemService {
                 throw new BusinessException(404, "商品不存在");
             }
         }
-        // TODO 3：shopName 回填（详情只有一条，直接 selectById 就够，不涉及 N+1）
+        // 步骤 3：shopName 回填（详情只有一条，直接 selectById 就够，不涉及 N+1）
         //   店可能已经关了（status != 正常），这种情况 shopName 给店名还是 null？
         //   建议给店名 —— 已成交的订单以后还要展示它
 
         //
-        // TODO 4：return ItemVO.of(item, fromJson(item.getImagesJson()))
+        // 步骤 4：return ItemVO.of(item, fromJson(item.getImagesJson()))
         ItemVO vo = ItemVO.of(item, fromJson(item.getImagesJson()));
         if (shop != null) {
             vo.setShopName(shop.getName());
@@ -383,13 +383,13 @@ public class ItemService {
      */
     public ItemVO changeStatus(Long userId, Long itemId, Integer status) {
 
-        // TODO 1：查商品，不存在 → 404 "商品不存在"
+        // 步骤 1：查商品，不存在 → 404 "商品不存在"
         //
         Item item = itemMapper.selectById(itemId);
         if (item == null) {
             throw new BusinessException(404, "商品不存在");
         }
-        // TODO 2：鉴权 —— 这件商品的店是不是当前用户的
+        // 步骤 2：鉴权 —— 这件商品的店是不是当前用户的
         //   shopMapper.selectById(item.getShopId())
         //   !shop.getOwnerUserId().equals(userId) → 403 "只能改自己店里的商品"
         //   提示：一律用 equals 不用 ==（Long 超过 127 时 == 比的是引用）
@@ -399,7 +399,7 @@ public class ItemService {
             throw new BusinessException(403, "只能改自己店里的商品");
         }
 
-        // TODO 3：幂等 —— item.getStatus() == status 时直接返回当前 VO，别更新
+        // 步骤 3：幂等 —— item.getStatus() == status 时直接返回当前 VO，别更新
         //   理由：前端网络重试、用户连点两下都会重复提交，
         //   第二次执行相同操作不该报错，也不该白改一次 updated_at
         //
@@ -408,16 +408,16 @@ public class ItemService {
             vo.setShopName(shop.getName());
             return vo;
         }
-        // TODO 4：item.setStatus(status); itemMapper.updateById(item);
+        // 步骤 4：item.setStatus(status); itemMapper.updateById(item);
         //   updateById 会带上 logic-delete 条件，删掉的商品改不动，正好
         //
         item.setStatus(status);
         itemMapper.updateById(item);
-        // TODO 5（可选，W5 再做）：有未完成订单时不允许下架
-        //   等 orders 表有数据了，在这里数一下 status in (待付款, 待发货) 的订单，
-        //   有就 BusinessException("还有未完成的订单，不能下架")\
+        // 待办（W6）：有未完成订单时不允许下架。
+        //   等订单功能稳定后，在这里数一下 status in (0 待付款, 1 待发货) 的订单，
+        //   有就 throw new BusinessException("还有未完成的订单，不能下架");
 
-        // TODO 6：返回改完的 VO（shopName 记得填）
+        // 步骤 6：返回改完的 VO（shopName 记得填）
         //
 
         ItemVO vo = ItemVO.of(item, fromJson(item.getImagesJson()));

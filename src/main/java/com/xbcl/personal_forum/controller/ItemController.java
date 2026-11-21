@@ -32,7 +32,7 @@ import java.util.List;
  *   GET    /dev-api/item/mine         我发布的（含下架）  需 token
  *   GET    /dev-api/item/category/list 商品分类           游客可见（白名单）
  *   GET    /dev-api/item/list         集市列表           游客可见（白名单，W3）
- *   GET    /dev-api/item/{id}         商品详情           需 token（W3，见下方 TODO）
+ *   GET    /dev-api/item/{id}         商品详情           需 token（W3）
  *   PATCH  /dev-api/item/{id}/status  上架 / 下架        需 token，且必须是店主（W3）
  * </pre>
  *
@@ -103,7 +103,7 @@ public class ItemController {
 
     // =====================================================================
     // 以下是 W3 骨架：路径、入参、返回都定好了，方法体在 Service 里，
-    // 那边是 TODO。Controller 这一层基本不用改，你只需要去 ItemService 填。
+    // 那边已经实现完了。Controller 这一层基本不用改，要调逻辑去 ItemService。
     // =====================================================================
 
     /**
