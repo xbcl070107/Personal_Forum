@@ -8,6 +8,7 @@ import tools.jackson.databind.ObjectMapper;
 import com.xbcl.personal_forum.common.BusinessException;
 import com.xbcl.personal_forum.mapper.CategoryMapper;
 import com.xbcl.personal_forum.mapper.ItemMapper;
+import com.xbcl.personal_forum.mapper.OrdersMapper;
 import com.xbcl.personal_forum.mapper.ShopMapper;
 import com.xbcl.personal_forum.pojo.dto.ItemPublishDTO;
 import com.xbcl.personal_forum.pojo.entity.Category;
@@ -73,6 +74,15 @@ public class ItemService {
      * ShopService 现在只有按单个 id 查的方法，逐条调就是 N+1。
      */
     private final ShopMapper shopMapper;
+
+    /**
+     * W6 才注入：下架前要数「这件商品还有几笔没走完的订单」。
+     *
+     * <p>用 Mapper 而不是 OrderService，是为了不把 ItemService ↔ OrderService
+     * 变成循环依赖（OrderService 已经注入了 ItemMapper 去扣库存，虽然那是 Mapper 不是 Service，
+     * 但两个 Service 互相注入这种结构最好一开始就别养成）。
+     */
+    private final OrdersMapper ordersMapper;
 
     /** 每页最多 50 条，和 PostService 同一套夹取规则 */
     private static final long MAX_PAGE_SIZE = 50;
@@ -366,60 +376,67 @@ public class ItemService {
     }
 
     /**
-     * 上架 / 下架（PATCH /item/{id}/status）。
+     * 上架 / 下架一件商品。下架前会先确认它没有没走完的订单。
      *
-     * <p>入参 status 只能是 0 或 1（DTO 里已经校验过，进到这里是干净的）。
+     * <p><b>接口</b>：<code>PATCH /dev-api/item/{id}/status</code>，带 token。
+     * <pre>
+     * 请求体  {"status":0}          0 下架 / 1 上架（DTO 已校验，进到方法里只有这两个值）
+     * 成功    {"code":200,"msg":"ok","data":{"id":7,"status":0,"statusText":"已下架"}}
+     *          前端拿返回的 VO 就地刷新那一行，不用再发一次详情请求
+     * </pre>
      *
-     * <p>返回：改完之后的 {@code ItemVO}，前端拿它就地刷新那一行，
-     * 不用再发一次详情请求。
+     * <p><b>会改的数据</b>：item.status 0 ↔ 1。目标状态本来就是当前状态时直接返回，不写库。
      *
-     * <p>验收：
+     * <p><b>失败情况</b>
      * <ul>
-     *   <li>店主把自己商品改成 0 → 200，集市列表里消失，
-     *       GET /item/mine 里还在（status=0）</li>
-     *   <li>非店主改别人的商品 → 403 "只能改自己店里的商品"</li>
-     *   <li>把已经是 1 的商品再改成 1 → 200，不报错（幂等）</li>
+     *   <li>400 还有 N 笔订单没完成，不能下架</li>
+     *   <li>403 只能改自己店里的商品</li>
+     *   <li>404 商品不存在</li>
      * </ul>
+     *
+     * <p><b>注意</b>：只在「下架」时数订单（status 是 0 待付款或 1 待发货），上架永远放行。
+     * 为什么这么设计，见方法体第 4 步的 ps。
      */
     public ItemVO changeStatus(Long userId, Long itemId, Integer status) {
-
-        // 步骤 1：查商品，不存在 → 404 "商品不存在"
-        //
+        // 1. 查商品，查不到就 404
+        //    ps：先 404 再判归属 —— 商品不存在和「存在但不是你的」要能分开回
         Item item = itemMapper.selectById(itemId);
         if (item == null) {
             throw new BusinessException(404, "商品不存在");
         }
-        // 步骤 2：鉴权 —— 这件商品的店是不是当前用户的
-        //   shopMapper.selectById(item.getShopId())
-        //   !shop.getOwnerUserId().equals(userId) → 403 "只能改自己店里的商品"
-        //   提示：一律用 equals 不用 ==（Long 超过 127 时 == 比的是引用）
-        //
+        // 2. 判归属：这件商品的店是不是当前用户的
+        //    ps：一律用 Objects.equals，不用 ==（Long 超过 127 时 == 比的是引用，会随机放行或拦错）
+        //    ps：店也是 null（数据被硬删过）时按「不是你的」处理，别让 NPE 变成 500
         Shop shop = shopMapper.selectById(item.getShopId());
         if (shop == null || !Objects.equals(shop.getOwnerUserId(), userId)) {
             throw new BusinessException(403, "只能改自己店里的商品");
         }
-
-        // 步骤 3：幂等 —— item.getStatus() == status 时直接返回当前 VO，别更新
-        //   理由：前端网络重试、用户连点两下都会重复提交，
-        //   第二次执行相同操作不该报错，也不该白改一次 updated_at
-        //
+        // 3. 幂等：目标状态和当前一样就直接返回，别白写一次库
+        //    ps：前端网络重试、用户连点两下都会重复提交；第二次不该报错，也不该白改 updated_at
         if (Objects.equals(item.getStatus(), status)) {
             ItemVO vo = ItemVO.of(item, fromJson(item.getImagesJson()));
             vo.setShopName(shop.getName());
             return vo;
         }
-        // 步骤 4：item.setStatus(status); itemMapper.updateById(item);
-        //   updateById 会带上 logic-delete 条件，删掉的商品改不动，正好
-        //
+        // 4. 下架前拦一道：还有没走完的订单，就不许下架
+        //    ps：买家可能已经付了钱，或者正卡在「待付款」倒计时里。卖家这时候把商品一撤，
+        //        这单要么得照常发货（商品都从集市上消失了），要么得退款（P1 没有退款流程），
+        //        两个后果都很糟，所以直接拒绝，让卖家先把那几笔处理掉
+        //    ps：只拦下架（目标 STATUS_OFF），上架永远放行
+        //    ps：这是「先查再写」，但这里可以接受 —— 下架本身幂等，两个请求同时通过、都 update，结果一样；
+        //        最坏是「刚下单 + 刚好下架」的窗口，由 OrderService 下单时的条件扣库存兜着（扣不到就下单失败）
+        if (Objects.equals(status, Item.STATUS_OFF)) {
+            long unfinished = ordersMapper.countUnfinishedByItem(itemId);
+            if (unfinished > 0) {
+                throw new BusinessException("还有 " + unfinished + " 笔订单没完成，不能下架");
+            }
+        }
+        // 5. 改状态
+        //    ps：updateById 会按逻辑删除自动补 is_deleted = 0，删掉的商品改不动，正好
         item.setStatus(status);
         itemMapper.updateById(item);
-        // 待办（W6）：有未完成订单时不允许下架。
-        //   等订单功能稳定后，在这里数一下 status in (0 待付款, 1 待发货) 的订单，
-        //   有就 throw new BusinessException("还有未完成的订单，不能下架");
-
-        // 步骤 6：返回改完的 VO（shopName 记得填）
-        //
-
+        // 6. 返回改完的 VO
+        //    ps：shopName 用第 2 步查到的 shop，别再查一次库
         ItemVO vo = ItemVO.of(item, fromJson(item.getImagesJson()));
         vo.setShopName(shop.getName());
         return vo;

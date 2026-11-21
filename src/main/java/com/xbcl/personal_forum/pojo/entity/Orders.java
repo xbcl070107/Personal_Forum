@@ -93,4 +93,19 @@ public class Orders {
     public static final int STATUS_SHIPPED = 2;
     public static final int STATUS_FINISHED = 3;
     public static final int STATUS_CANCELED = 4;
+
+    /**
+     * 关单原因（orders.close_reason），只对 status = 4 有意义。
+     *
+     * <p>三条进入「已取消」的路各有一个值：超时未付款、买家主动取消、卖家拒单。
+     * SELLER_REJECT 是给卖家拒单留的位置 —— W6 的状态机里还没有这条边，
+     * 先把常量放着，等真做「卖家拒单」时不用再回来加。
+     *
+     * <p>为什么存字符串而不是 0/1/2：状态位要参与 WHERE 判断，所以用数字；
+     * close_reason 只给人看、给对账查，没有条件依赖它，可读的字符串更省事。
+     * 也正因为如此，它<b>不能</b>拿来做幂等或业务的判断依据。
+     */
+    public static final String CLOSE_TIMEOUT = "TIMEOUT";
+    public static final String CLOSE_BUYER_CANCEL = "BUYER_CANCEL";
+    public static final String CLOSE_SELLER_REJECT = "SELLER_REJECT";
 }

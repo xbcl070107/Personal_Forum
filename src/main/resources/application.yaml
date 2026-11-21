@@ -32,6 +32,19 @@ forum:
     # 否则前端拿到 /uploads/xxx.jpg 去请求会是 404 —— 真正的地址是 /dev-api/uploads/xxx.jpg
     url-prefix: /dev-api/uploads
 
+  # ---- W6：超时关单（task/OrderTimeoutTask）----
+  # 三个值都有代码里的默认值（@Value 的冒号右边），这里写出来是为了「能一眼看见、能直接改」。
+  order:
+    # 两轮之间隔多久（fixedDelay：上一轮跑完再等这么久，不是每这么久跑一次）
+    timeout-scan-interval-ms: 60000
+
+    # 一轮最多关多少单。积压很多时，调大能关得快些，但单轮占用的时间也变长
+    timeout-batch-size: 200
+
+    # ⚠️ 骨架期必须是 false：OrderService.closeTimeoutOrder 还是抛 501 的骨架，
+    #    开着的话每分钟都会刷一条错误日志。等那个方法实现完、验收通过，再改成 true。
+    timeout-scan-enabled: false
+
 mybatis-plus:
   configuration:
     # 库里的 sort_order / created_at 自动映射到 Java 的 sortOrder / createdAt。

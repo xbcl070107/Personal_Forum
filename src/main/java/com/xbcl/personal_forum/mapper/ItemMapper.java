@@ -62,4 +62,31 @@ public interface ItemMapper extends BaseMapper<Item> {
                AND stock >= #{qty}
             """)
     int deductStock(@Param("itemId") Long itemId, @Param("qty") int qty);
+
+    /**
+     * 回补库存（W6）：取消订单 / 超时关单时把扣掉的还回去。
+     *
+     * <p>和 {@link #deductStock} 是一对，但 WHERE 条件<b>故意不一样</b>：
+     * 扣的时候要卡「在售 + 没删 + 库存够」，还的时候什么都不卡，只认主键。
+     *
+     * <p><b>为什么还账不能带 status = 1 和 is_deleted = 0：</b>
+     * 下单时商品在售，不代表取消时还在售 —— 卖家可能已经把它下架了，
+     * 甚至下架之后又被软删了。这时候库存也是实实在在少掉的（当初扣过），
+     * 不带条件地加回去才是对的。要是照着 deductStock 抄条件，就会出现
+     * 「商品下架了 → 回补 0 行 → 库存永久少 N 件」，而且日志里看不出任何异常。
+     *
+     * <p><b>为什么没有「最多回到多少」的上限判断：</b>回补的数量来自 order_item 快照，
+     * 不来自前端；能加超只可能是同一单被回补了两次，那是幂等没做好，
+     * 靠 stock_log 的唯一键（uk_order_item_reason）兜底，而不是靠这里的 WHERE。
+     *
+     * @param itemId 商品 id
+     * @param qty    要加回去的数量（调用前保证 ≥ 1）
+     * @return 受影响行数：1 成功，0 说明商品连行都没了（物理删除），调用方记 warn 但不要抛
+     */
+    @Update("""
+            UPDATE item
+               SET stock = stock + #{qty}
+             WHERE id = #{itemId}
+            """)
+    int restoreStock(@Param("itemId") Long itemId, @Param("qty") int qty);
 }
